@@ -2,16 +2,10 @@
 
 import React, { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-    Heart,
-    MessageCircle,
-    Share2,
-    MoreHorizontal,
-    Play,
-    Loader2
-} from "lucide-react"
+import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
+import { useAuth } from "@/context/AuthContext"
 import Link from "next/link"
 import dynamic from 'next/dynamic'
 
@@ -33,8 +27,30 @@ interface Post {
 }
 
 export default function Home() {
+    const { user } = useAuth()
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
+
+    const handleLike = async (postId: string, currentLikes: string[]) => {
+        if (!user) return;
+
+        const postRef = doc(db, "posts", postId);
+        const isLiked = currentLikes.includes(user.uid);
+
+        try {
+            if (isLiked) {
+                await updateDoc(postRef, {
+                    likes: arrayRemove(user.uid)
+                });
+            } else {
+                await updateDoc(postRef, {
+                    likes: arrayUnion(user.uid)
+                });
+            }
+        } catch (error) {
+            console.error("Error toggling like:", error);
+        }
+    };
 
     // Helper for time formatting
     const timeAgo = (date: Date) => {
@@ -119,10 +135,10 @@ export default function Home() {
                                         </div>
                                     </div>
                                     <div>
-                                        <h3 className="font-black text-white text-[16px] leading-tight">
-                                            {post.authorName || 'User'}
+                                        <h3 className="font-black text-white text-[16px] leading-tight hover:text-cyber-pink transition-colors">
+                                            {post.authorName || post.authorUsername || 'Anonymous'}
                                         </h3>
-                                        <p className="text-white/40 text-xs font-bold tracking-tight">@{post.authorUsername || 'user'}</p>
+                                        <p className="text-white/40 text-xs font-bold tracking-tight">@{post.authorUsername?.toLowerCase() || 'user'}</p>
                                     </div>
                                 </Link>
                                 <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/20" />
@@ -167,8 +183,17 @@ export default function Home() {
                             {/* Footer / Actions */}
                             <div className="px-6 py-5">
                                 <div className="flex items-center gap-6 mb-4">
-                                    <button className="text-white transition-transform active:scale-90">
-                                        <Heart className="w-7 h-7 stroke-[1.5px]" />
+                                    <button
+                                        onClick={() => handleLike(post.id, post.likes || [])}
+                                        className={`transition-all active:scale-75 ${user && post.likes?.includes(user.uid)
+                                                ? 'text-cyber-pink drop-shadow-[0_0_8px_rgba(255,45,108,0.5)]'
+                                                : 'text-white hover:text-white/80'
+                                            }`}
+                                    >
+                                        <Heart
+                                            className={`w-7 h-7 stroke-[2px] ${user && post.likes?.includes(user.uid) ? 'fill-cyber-pink' : 'fill-transparent'
+                                                }`}
+                                        />
                                     </button>
                                     <button className="text-white transition-transform active:scale-90">
                                         <MessageCircle className="w-7 h-7 stroke-[1.5px]" />

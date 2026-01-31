@@ -5,9 +5,9 @@ const MUX_TOKEN_SECRET = 'ibqKgbJMorl4VijAweAfuYq2Ig2qKRaxbCqmhVKpfVdAlFKQpjkv42
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { uploadId: string } }
+    { params }: { params: Promise<{ uploadId: string }> }
 ) {
-    const uploadId = params.uploadId;
+    const { uploadId } = await params;
 
     try {
         const response = await fetch(`https://api.mux.com/video/v1/uploads/${uploadId}`, {
