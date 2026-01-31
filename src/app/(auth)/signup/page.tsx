@@ -24,7 +24,7 @@ export default function SignupPage() {
             {/* Back to Home Action */}
             <Link href="/" className="absolute top-8 left-8 flex items-center gap-2 text-white/40 hover:text-white font-black text-[10px] uppercase tracking-[0.3em] transition-all group z-20">
                 <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                Back to Mission
+                Back
             </Link>
 
             <motion.div
@@ -34,16 +34,16 @@ export default function SignupPage() {
                 className="w-full max-w-[1000px] grid lg:grid-cols-2 gap-0 bg-[#111111]/80 border border-white/5 backdrop-blur-3xl rounded-[48px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,1)]"
             >
                 {/* Left Column: Immersion & Credibility */}
-                <div className="hidden lg:flex flex-col justify-between p-16 bg-gradient-to-br from-white/[0.02] to-transparent border-r border-white/5 relative overflow-hidden">
+                <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-white/[0.02] to-transparent border-r border-white/5 relative overflow-hidden">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,45,108,0.1),transparent)]" />
 
                     <div className="relative z-10 text-left">
                         <CredaLogo size={60} />
-                        <h2 className="mt-12 text-6xl font-black text-white leading-[0.85] tracking-tighter">
+                        <h2 className="mt-8 text-6xl font-black text-white leading-[0.85] tracking-tighter">
                             START YOUR<br />
                             <span className="text-cyber-pink italic">LEGACY.</span>
                         </h2>
-                        <p className="mt-8 text-white/40 font-medium leading-relaxed max-w-xs text-base">
+                        <p className="mt-6 text-white/40 font-medium leading-relaxed max-w-xs text-base">
                             Join the elite 0.1% of creators who have reclaimed their focus and scaled their digital presence.
                         </p>
                     </div>
@@ -68,13 +68,13 @@ export default function SignupPage() {
                 </div>
 
                 {/* Right Column: Authentication Gateway */}
-                <div className="p-8 md:p-16 flex flex-col justify-center items-center">
-                    <div className="w-full max-w-xs space-y-10">
+                <div className="p-8 md:p-10 flex flex-col justify-center items-center">
+                    <div className="w-full max-w-xs space-y-6">
                         {/* Brand Header (Mobile Only) */}
-                        <div className="lg:hidden text-center mb-10"><CredaLogo size={50} /></div>
+                        <div className="lg:hidden text-center mb-6"><CredaLogo size={50} /></div>
 
                         {/* Typography Header */}
-                        <div className="text-center space-y-3">
+                        <div className="text-center space-y-2">
                             <h1 className="text-4xl font-black text-white tracking-tight">Create Account</h1>
                             <p className="text-white/40 text-[11px] font-black uppercase tracking-[0.2em]">Enter the premium ecosystem</p>
                         </div>
@@ -111,7 +111,7 @@ export default function SignupPage() {
                             <motion.button
                                 whileHover={{ scale: 1.02, y: -2 }}
                                 whileTap={{ scale: 0.98 }}
-                                className="w-full flex items-center justify-between px-7 py-5 bg-white rounded-3xl group transition-all"
+                                className="w-full flex items-center justify-between px-7 py-4 bg-white rounded-3xl group transition-all"
                             >
                                 <div className="flex items-center gap-4">
                                     <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -129,7 +129,7 @@ export default function SignupPage() {
                             <motion.button
                                 whileHover={{ scale: 1.02, y: -2, backgroundColor: "rgba(255,255,255,0.06)" }}
                                 whileTap={{ scale: 0.98 }}
-                                className="w-full flex items-center justify-between px-7 py-5 bg-black border border-white/10 rounded-3xl group transition-all"
+                                className="w-full flex items-center justify-between px-7 py-4 bg-black border border-white/10 rounded-3xl group transition-all"
                             >
                                 <div className="flex items-center gap-4">
                                     <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white">
@@ -144,7 +144,7 @@ export default function SignupPage() {
                             <motion.button
                                 whileHover={{ scale: 1.02, y: -2 }}
                                 whileTap={{ scale: 0.98 }}
-                                className="w-full flex items-center justify-between px-7 py-5 bg-[#1DB954] rounded-3xl group transition-all"
+                                className="w-full flex items-center justify-between px-7 py-4 bg-[#1DB954] rounded-3xl group transition-all"
                             >
                                 <div className="flex items-center gap-4">
                                     <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white">
@@ -156,28 +156,30 @@ export default function SignupPage() {
                             </motion.button>
 
                             {/* Email/Phone */}
-                            <motion.button
-                                whileHover={{ scale: 1.02, y: -2, backgroundColor: "rgba(255,255,255,0.06)" }}
-                                whileTap={{ scale: 0.98 }}
-                                className="w-full flex items-center justify-between px-7 py-5 bg-transparent border border-white/10 rounded-3xl group transition-all"
-                            >
-                                <div className="flex items-center gap-4 text-white">
-                                    <span className="text-[13px] font-black tracking-tight">Signup with Email or Phone</span>
-                                </div>
-                                <ArrowRight className="w-4 h-4 text-white/10 group-hover:text-white transition-colors" />
-                            </motion.button>
+                            <Link href="/email-signup" className="w-full">
+                                <motion.button
+                                    whileHover={{ scale: 1.02, y: -2, backgroundColor: "rgba(255,255,255,0.06)" }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="w-full flex items-center justify-between px-7 py-4 bg-transparent border border-white/10 rounded-3xl group transition-all"
+                                >
+                                    <div className="flex items-center gap-4 text-white">
+                                        <span className="text-[13px] font-black tracking-tight">Signup with Email or Phone</span>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-white/10 group-hover:text-white transition-colors" />
+                                </motion.button>
+                            </Link>
                         </div>
 
                         {/* End-to-end indicator */}
-                        <div className="pt-8 flex flex-col items-center gap-4">
+                        <div className="pt-6 flex flex-col items-center gap-4">
                             <div className="flex items-center gap-2 text-[9px] font-black text-cyber-pink/60 uppercase tracking-[0.3em]">
                                 <ShieldCheck className="w-3.5 h-3.5" />
                                 End-to-end secure gateway activated
                             </div>
                         </div>
 
-                        <p className="mt-10 text-center text-[10px] font-bold text-white/20 uppercase tracking-widest">
-                            Already have an account? <Link href="/login" className="text-white hover:text-cyber-pink transition-colors underline underline-offset-4 decoration-cyber-pink/30">Login to Ecosystem</Link>
+                        <p className="mt-6 text-center text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                            Already have an account? <Link href="/login" className="text-white hover:text-cyber-pink transition-colors underline underline-offset-4 decoration-cyber-pink/30">Login</Link>
                         </p>
                     </div>
                 </div>

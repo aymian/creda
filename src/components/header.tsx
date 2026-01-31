@@ -14,10 +14,16 @@ import {
     Menu,
     X,
     Trophy,
-    CreditCard
+    CreditCard,
+    Bell,
+    LogOut
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useAuth } from "@/context/AuthContext"
+import { UserDropdown } from "@/components/UserDropdown"
+import { CredaLogo } from "@/components/logo"
+import { auth } from "@/lib/firebase"
 
 const NAV_ITEMS = [
     { icon: ThumbsUp, label: "For You", id: "foryou" },
@@ -26,9 +32,8 @@ const NAV_ITEMS = [
     { icon: MessageCircle, label: "Chats", id: "chats", badge: 5 },
 ]
 
-import { CredaLogo } from "@/components/logo"
-
 export function Header() {
+    const { user, loading } = useAuth()
     const [activeTab, setActiveTab] = useState("foryou")
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -93,24 +98,39 @@ export function Header() {
                             <Star className="w-5 h-5 hover:text-white transition-colors cursor-pointer" />
                             <div className="absolute top-0 right-0 w-2 h-2 bg-cyber-pink rounded-full border-2 border-[#0C0C0C]" />
                         </motion.div>
+                        <motion.div
+                            whileHover={{ scale: 1.1, rotate: 10 }}
+                            className="relative cursor-pointer p-2 hover:bg-white/5 rounded-xl transition-all"
+                        >
+                            <Bell className="w-5 h-5 text-white/40 hover:text-cyber-pink transition-colors" />
+                            <div className="absolute top-2 right-2 w-2 h-2 bg-cyber-pink rounded-full border-2 border-[#0C0C0C]" />
+                        </motion.div>
                     </div>
 
                     <div className="h-6 w-px bg-white/10 mx-2" />
 
-                    <div className="flex items-center gap-6">
-                        <Link href="/login" className="text-white/60 hover:text-white font-bold text-sm transition-colors">
-                            Sign in
-                        </Link>
+                    <div className="flex items-center gap-6 min-w-[140px] justify-end">
+                        {loading ? (
+                            <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />
+                        ) : user ? (
+                            <UserDropdown />
+                        ) : (
+                            <>
+                                <Link href="/login" className="text-white/60 hover:text-white font-bold text-sm transition-colors whitespace-nowrap">
+                                    Sign in
+                                </Link>
 
-                        <Link href="/login">
-                            <motion.button
-                                whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(255, 45, 108, 0.4)" }}
-                                whileTap={{ scale: 0.95 }}
-                                className="bg-cyber-pink text-white px-8 py-3 rounded-full font-black text-sm transition-all shadow-[0_0_15px_rgba(255,45,108,0.3)]"
-                            >
-                                Get Started
-                            </motion.button>
-                        </Link>
+                                <Link href="/login">
+                                    <motion.button
+                                        whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(255, 45, 108, 0.4)" }}
+                                        whileTap={{ scale: 0.95 }}
+                                        className="bg-cyber-pink text-white px-8 py-3 rounded-full font-black text-sm transition-all shadow-[0_0_15px_rgba(255,45,108,0.3)] whitespace-nowrap"
+                                    >
+                                        Get Started
+                                    </motion.button>
+                                </Link>
+                            </>
+                        )}
                     </div>
 
                     {/* Mobile Menu Toggle */}
@@ -159,12 +179,33 @@ export function Header() {
                             ))}
                         </div>
 
-                        <Link href="/login" className="w-full">
-                            <button className="w-full flex items-center justify-center gap-3 bg-cyber-pink text-white py-5 rounded-2xl font-black shadow-[0_0_30px_rgba(255,45,108,0.4)]">
-                                <LogIn className="w-6 h-6" />
-                                SIGN IN
-                            </button>
-                        </Link>
+                        {user ? (
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                    <div className="w-12 h-12 rounded-full bg-cyber-pink flex items-center justify-center text-white font-black">
+                                        {user.email?.[0].toUpperCase()}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-white font-black text-sm uppercase tracking-wider">{user.email?.split('@')[0]}</span>
+                                        <span className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Active Focus Session</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => auth.signOut()}
+                                    className="w-full flex items-center justify-center gap-3 bg-white/5 text-white/40 py-5 rounded-2xl font-black border border-white/5 hover:bg-cyber-pink/10 hover:text-cyber-pink transition-all"
+                                >
+                                    <LogOut className="w-6 h-6" />
+                                    AUTHORIZE EXIT
+                                </button>
+                            </div>
+                        ) : (
+                            <Link href="/login" className="w-full">
+                                <button className="w-full flex items-center justify-center gap-3 bg-cyber-pink text-white py-5 rounded-2xl font-black shadow-[0_0_30px_rgba(255,45,108,0.4)]">
+                                    <LogIn className="w-6 h-6" />
+                                    SIGN IN
+                                </button>
+                            </Link>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
