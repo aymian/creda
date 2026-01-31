@@ -13,10 +13,10 @@ import {
 import { db } from "@/lib/firebase"
 import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore"
 import Link from "next/link"
-import { MediaPlayer, MediaProvider } from '@vidstack/react';
-import { CustomVideoLayout } from '@/components/player/CustomVideoLayout';
+import dynamic from 'next/dynamic'
 
-import '@vidstack/react/player/styles/default/theme.css';
+// Dynamically import the player component to avoid SSR issues with ReactPlayer
+const FeedVideoPlayer = dynamic(() => import('@/components/player/FeedVideoPlayer').then(mod => mod.FeedVideoPlayer), { ssr: false });
 
 interface Post {
     id: string
@@ -80,7 +80,7 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-[#0C0C0C] pb-20 pt-8">
-            <div className="max-w-xl mx-auto px-4 space-y-6">
+            <div className="max-w-md mx-auto px-4 space-y-8">
 
                 {/* Empty State */}
                 {posts.length === 0 && !loading && (
@@ -102,13 +102,13 @@ export default function Home() {
                             key={post.id}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="bg-black border border-white/10 rounded-[32px] overflow-hidden mb-8"
+                            className="bg-[#121212] rounded-[40px] overflow-hidden mb-10 shadow-2xl border border-white/5"
                         >
                             {/* Header */}
-                            <div className="p-4 flex items-center justify-between">
-                                <Link href={`/${post.authorUsername}`} className="flex items-center gap-3 group">
-                                    <div className="w-10 h-10 rounded-full p-[2px] bg-gradient-to-tr from-cyber-pink to-purple-600">
-                                        <div className="w-full h-full rounded-full overflow-hidden border-2 border-black bg-white/10">
+                            <div className="p-5 flex items-center justify-between">
+                                <Link href={`/${post.authorUsername || 'user'}`} className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-cyber-pink to-purple-600">
+                                        <div className="w-full h-full rounded-full overflow-hidden border-2 border-[#121212] bg-white/10">
                                             {post.authorPhoto ? (
                                                 <img src={post.authorPhoto} alt={post.authorName} className="w-full h-full object-cover" />
                                             ) : (
@@ -119,88 +119,83 @@ export default function Home() {
                                         </div>
                                     </div>
                                     <div>
-                                        <h3 className="font-black text-white text-[15px] leading-tight group-hover:text-cyber-pink transition-colors">
-                                            {post.authorName}
+                                        <h3 className="font-black text-white text-[16px] leading-tight">
+                                            {post.authorName || 'User'}
                                         </h3>
-                                        <p className="text-white/40 text-xs font-medium">@{post.authorUsername}</p>
+                                        <p className="text-white/40 text-xs font-bold tracking-tight">@{post.authorUsername || 'user'}</p>
                                     </div>
                                 </Link>
-                                <button className="p-2 text-white/20 hover:text-white transition-colors">
-                                    <MoreHorizontal className="w-5 h-5" />
-                                </button>
+                                <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/20" />
                             </div>
 
-                            {/* Media */}
-                            {post.mediaUrl && (
-                                <div className="w-full bg-black/50 overflow-hidden">
-                                    {post.mediaType === 'video' ? (
-                                        <div className="relative aspect-square vidstack-player-wrapper">
-                                            <MediaPlayer
-                                                title={post.content || "Post Video"}
-                                                src={post.mediaUrl}
+                            {/* Media Section with Content Overlay */}
+                            <div className="relative w-full aspect-[4/5] bg-black overflow-hidden group">
+                                {post.mediaUrl ? (
+                                    <>
+                                        {post.mediaType === 'video' ? (
+                                            <FeedVideoPlayer
+                                                src={post.mediaUrl || ''}
+                                                poster={post.mediaUrl?.replace(/\.[^/.]+$/, ".jpg")}
+                                            />
+                                        ) : (
+                                            <img
+                                                src={post.mediaUrl?.includes('res.cloudinary.com')
+                                                    ? post.mediaUrl.replace('/upload/', '/upload/w_800,c_fill,q_auto,f_auto/')
+                                                    : post.mediaUrl
+                                                }
+                                                alt="Post media"
                                                 className="w-full h-full object-cover"
-                                                aspectRatio="1/1"
-                                                load="visible"
-                                                poster={`${post.mediaUrl}?tr=w-800,h-800,so-0`}
-                                            >
-                                                <MediaProvider />
-                                                <CustomVideoLayout />
-                                            </MediaPlayer>
+                                                loading="lazy"
+                                            />
+                                        )}
+                                        {/* Content Overlay - matches reference style */}
+                                        <div className="absolute bottom-0 inset-x-0 p-6 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                                            <p className="text-xl font-black text-white leading-tight drop-shadow-lg">
+                                                {post.content}
+                                            </p>
                                         </div>
-                                    ) : (
-                                        <img
-                                            src={post.mediaUrl}
-                                            alt="Post media"
-                                            className="w-full object-cover"
-                                            loading="lazy"
-                                        />
-                                    )}
-                                </div>
-                            )}
+                                    </>
+                                ) : (
+                                    <div className="w-full aspect-video flex items-center justify-center p-8 bg-gradient-to-br from-cyber-pink/20 to-purple-900/40">
+                                        <p className="text-2xl font-black text-center text-white italic">
+                                            "{post.content}"
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Footer / Actions */}
-                            <div className="p-4 pt-3">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-5">
-                                        <button className="text-white hover:text-cyber-pink transition-colors">
-                                            <Heart className="w-7 h-7 stroke-[1.5px]" />
-                                        </button>
-                                        <button className="text-white hover:text-cyber-cyan transition-colors">
-                                            <MessageCircle className="w-7 h-7 stroke-[1.5px]" />
-                                        </button>
-                                        <button className="text-white hover:text-green-400 transition-colors">
-                                            <Share2 className="w-7 h-7 stroke-[1.5px]" />
-                                        </button>
-                                    </div>
+                            <div className="px-6 py-5">
+                                <div className="flex items-center gap-6 mb-4">
+                                    <button className="text-white transition-transform active:scale-90">
+                                        <Heart className="w-7 h-7 stroke-[1.5px]" />
+                                    </button>
+                                    <button className="text-white transition-transform active:scale-90">
+                                        <MessageCircle className="w-7 h-7 stroke-[1.5px]" />
+                                    </button>
+                                    <button className="text-white transition-transform active:scale-90">
+                                        <Share2 className="w-7 h-7 stroke-[1.5px]" />
+                                    </button>
                                 </div>
 
-                                {/* Likes */}
-                                <div className="font-black text-white text-sm mb-2">
-                                    {(post.likes?.length || 0).toLocaleString()} likes
-                                </div>
-
-                                {/* Caption */}
+                                {/* Stats & Caption Style */}
                                 <div className="space-y-1">
-                                    <div className="text-[15px] leading-snug">
-                                        <Link href={`/${post.authorUsername}`} className="font-black text-white mr-2 hover:underline">
-                                            {post.authorUsername}
-                                        </Link>
-                                        <span className="text-white/90 font-medium">
-                                            {post.content}
+                                    <div className="font-extrabold text-[15px] text-white">
+                                        {(post.likes?.length || 0).toLocaleString()} likes
+                                    </div>
+                                    <div className="text-[14px]">
+                                        <span className="font-black text-white mr-2">@{post.authorUsername?.toLowerCase() || 'user'}</span>
+                                        <span className="text-white/60 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                                            {(post.content || "").length > 50 ? post.content.substring(0, 50) + "..." : post.content}
                                         </span>
                                     </div>
                                 </div>
 
-                                {/* Comments Count / View all */}
-                                {post.comments > 0 && (
-                                    <button className="text-white/40 text-sm mt-2 font-medium hover:text-white transition-colors">
-                                        View all {post.comments} comments
-                                    </button>
-                                )}
-
-                                {/* Timestamp */}
-                                <div className="text-white/30 text-[10px] uppercase font-bold tracking-widest mt-2">
-                                    {post.createdAt?.toDate ? timeAgo(post.createdAt.toDate()) : 'JUST NOW'}
+                                <div className="mt-3 flex items-center justify-between">
+                                    <div className="text-white/20 text-[10px] uppercase font-bold tracking-[0.2em]">
+                                        {post.createdAt?.toDate ? timeAgo(post.createdAt.toDate()) : 'JUST NOW'}
+                                    </div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
                                 </div>
                             </div>
                         </motion.div>

@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext"
 import { Header } from "@/components/header"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
-import { authenticator } from "@/lib/imagekit"
+import { uploadToCloudinary } from "@/lib/cloudinary"
 
 type CreateType = 'story' | 'post' | 'thread' | 'live' | 'lice' // 'lice' mapped to generic/clip if found
 
@@ -75,37 +75,16 @@ export default function CreatePage() {
             let mediaUrl = null
             let mediaType = null
 
-            // Upload to ImageKit if media exists
+            // Upload media
             if (media) {
-                const authParams = await authenticator()
+                const uploadResult = await uploadToCloudinary(media, "posts")
 
-                const formData = new FormData()
-                formData.append("file", media)
-                formData.append("fileName", media.name)
-                formData.append("publicKey", "public_/8WGY0IR1jwvVV052it5ZuPBDV0=")
-                formData.append("signature", authParams.signature || "")
-                formData.append("expire", authParams.expire || "")
-                formData.append("token", authParams.token || "")
-                formData.append("useUniqueFileName", "true")
-                formData.append("folder", "/posts")
-
-                const uploadRes = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-                    method: "POST",
-                    body: formData
-                })
-
-                if (!uploadRes.ok) {
-                    const errorText = await uploadRes.text()
-                    throw new Error(`Upload failed: ${uploadRes.status} ${errorText}`)
+                if (!uploadResult.success) {
+                    throw new Error(uploadResult.error || "Upload failed")
                 }
 
-                const uploadData = await uploadRes.json()
-                mediaUrl = uploadData.url
-                mediaType = uploadData.fileType // 'image' or 'non-image' (video is usually non-image or needs check)
-
-                // Better type detection based on file
-                if (media.type.startsWith('video')) mediaType = 'video'
-                else mediaType = 'image'
+                mediaUrl = uploadResult.url
+                mediaType = uploadResult.resourceType === "video" ? "video" : "image"
             }
 
             // Save to Firestore

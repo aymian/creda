@@ -91,8 +91,8 @@ export function CustomVideoLayout() {
                         </button>
 
                         <FullscreenButton className="group outline-none text-white/80 hover:text-white">
-                            <Maximize className="w-5 h-5 hidden data-[fullscreen]:block" />
-                            <Minimize className="w-5 h-5 hidden data-[not-fullscreen]:block" />
+                            <Maximize className="w-5 h-5 block data-[active]:hidden" />
+                            <Minimize className="w-5 h-5 hidden data-[active]:block" />
                         </FullscreenButton>
                     </div>
                 </div>
