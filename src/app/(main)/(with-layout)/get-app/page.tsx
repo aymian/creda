@@ -11,7 +11,11 @@ import {
     Zap,
     QrCode,
     ChevronRight,
-    ArrowRight
+    ArrowRight,
+    Star,
+    Heart,
+    Brain,
+    PlayCircle
 } from "lucide-react"
 
 export default function GetAppPage() {
@@ -45,29 +49,33 @@ export default function GetAppPage() {
                         </p>
 
                         <div className="flex flex-wrap gap-4 mt-4">
-                            {/* App Store Button */}
+                            {/* Official-style App Store Button */}
                             <motion.button
-                                whileHover={{ scale: 1.05, y: -5 }}
+                                whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                className="flex items-center gap-4 bg-white text-black px-8 py-4 rounded-2xl font-black transition-all shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
+                                className="flex items-center gap-3 bg-black border border-white/20 text-white px-6 py-3 rounded-xl transition-all shadow-xl hover:bg-[#111] hover:border-white/40"
                             >
-                                <Apple className="w-8 h-8" />
-                                <div className="flex flex-col items-start leading-tight">
-                                    <span className="text-[10px] uppercase font-bold opacity-60">Download on the</span>
-                                    <span className="text-xl">App Store</span>
+                                <Apple className="w-8 h-8 fill-current" />
+                                <div className="flex flex-col items-start leading-none -mt-1">
+                                    <span className="text-[10px] font-medium opacity-80 mb-1">Download on the</span>
+                                    <span className="text-xl font-bold font-sans tracking-tight">App Store</span>
                                 </div>
                             </motion.button>
 
-                            {/* Play Store Button */}
+                            {/* Official-style Play Store Button */}
                             <motion.button
-                                whileHover={{ scale: 1.05, y: -5 }}
+                                whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                className="flex items-center gap-4 bg-white/[0.05] border border-white/10 text-white px-8 py-4 rounded-2xl font-black transition-all hover:bg-white/10 group"
+                                className="flex items-center gap-3 bg-black border border-white/20 text-white px-6 py-3 rounded-xl transition-all shadow-xl hover:bg-[#111] hover:border-white/40"
                             >
-                                <Play className="w-8 h-8 text-cyber-cyan" fill="currentColor" />
-                                <div className="flex flex-col items-start leading-tight">
-                                    <span className="text-[10px] uppercase font-bold opacity-40 group-hover:opacity-60 transition-opacity">Get it on</span>
-                                    <span className="text-xl">Google Play</span>
+                                <div className="w-8 h-8 flex items-center justify-center">
+                                    <svg viewBox="0 0 24 24" className="w-full h-full fill-current">
+                                        <path d="M3.609 1.814L13.792 12l-10.183 10.186c-.19.186-.445.29-.711.29-.553 0-1-.447-1-1V2.104c0-.266.104-.52.29-.711.19-.186.445-.29.711-.29s.52.104.711.29zM14.5 12.708l3.053 3.054-13.044 7.429c-.276.157-.594.157-.87 0-.19-.108-.34-.27-.42-.46L14.5 12.708zm4.729-2.001l3.167 1.805c.276.157.445.452.445.768a.88.88 0 01-.445.768l-3.21 1.83-3.239-3.239 3.282-1.932zm-4.729-.707L3.712 2.571c.19-.108.411-.166.637-.166.226 0 .445.058.637.166l13.044 7.429L14.5 10z" />
+                                    </svg>
+                                </div>
+                                <div className="flex flex-col items-start leading-none -mt-1">
+                                    <span className="text-[10px] font-medium opacity-80 mb-1">GET IT ON</span>
+                                    <span className="text-xl font-bold font-sans tracking-tight">Google Play</span>
                                 </div>
                             </motion.button>
                         </div>
@@ -84,7 +92,7 @@ export default function GetAppPage() {
                         </div>
                     </motion.div>
 
-                    {/* Right Column: Visual Mockup */}
+                    {/* Right Column: Visual Mockup (Site Preview) */}
                     <div className="relative">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.8, y: 40 }}
@@ -93,43 +101,61 @@ export default function GetAppPage() {
                             className="relative z-10"
                         >
                             {/* Main Phone Mockup */}
-                            <div className="relative mx-auto w-[320px] h-[640px] bg-[#050505] rounded-[60px] border-[12px] border-[#1A1A1A] overflow-hidden shadow-[0_60px_100px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
+                            <div className="relative mx-auto w-[320px] h-[640px] bg-[#050505] rounded-[60px] border-[10px] border-[#1A1A1A] overflow-hidden shadow-[0_60px_100px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
                                 {/* Notch */}
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-8 bg-[#1A1A1A] rounded-b-3xl z-20" />
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-[#1A1A1A] rounded-b-3xl z-40" />
 
-                                {/* Inner Screen Content */}
-                                <div className="h-full w-full bg-[#0C0C0C] relative">
-                                    <div className="absolute inset-0 bg-gradient-to-b from-cyber-pink/10 to-transparent" />
+                                {/* Inner Screen Content: Site Preview */}
+                                <div className="h-full w-full bg-[#0C0C0C] relative flex flex-col pt-12 overflow-hidden">
+                                    {/* Mobile Header */}
+                                    <div className="px-6 flex justify-between items-center mb-10">
+                                        <div className="w-10 h-10 bg-cyber-pink rounded-xl flex items-center justify-center">
+                                            <Zap className="w-6 h-6 text-white fill-white" />
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-white/10" />
+                                    </div>
 
-                                    {/* Mockup UI Elements */}
-                                    <div className="p-8 pt-20 flex flex-col gap-6">
-                                        <div className="w-20 h-2 bg-white/10 rounded-full" />
-                                        <div className="w-full h-40 bg-white/5 border border-white/5 rounded-3xl" />
-                                        <div className="space-y-4">
-                                            {[1, 2, 3].map(i => (
-                                                <div key={i} className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-white/5" />
-                                                    <div className="flex-1 space-y-2">
-                                                        <div className="w-24 h-2 bg-white/10 rounded-full" />
-                                                        <div className="w-16 h-2 bg-white/5 rounded-full" />
-                                                    </div>
-                                                </div>
-                                            ))}
+                                    {/* Mobile Site Preview */}
+                                    <div className="px-8 flex flex-col gap-4 text-left">
+                                        <div className="inline-block bg-cyber-pink/20 border border-cyber-pink/30 px-3 py-1 rounded-full w-fit">
+                                            <span className="text-cyber-pink text-[8px] font-black tracking-widest uppercase">Focus Region</span>
+                                        </div>
+                                        <h2 className="text-4xl font-black text-white leading-tight tracking-tighter">
+                                            STOP SCROLLING. <br />
+                                            <span className="text-white/60">START WINNING.</span>
+                                        </h2>
+                                        <p className="text-white/40 text-xs font-medium leading-relaxed">
+                                            The social network that makes you focused, not distracted.
+                                        </p>
+                                        <div className="w-full h-12 bg-cyber-pink rounded-2xl mt-4 flex items-center justify-center shadow-[0_10px_20px_rgba(255,45,108,0.2)]">
+                                            <span className="text-white font-black text-sm uppercase">Quick Entry</span>
                                         </div>
                                     </div>
+
+                                    {/* Preview Feed Cards */}
+                                    <div className="mt-12 px-6 flex flex-col gap-4 opacity-40">
+                                        <div className="w-full h-32 bg-white/5 border border-white/5 rounded-3xl p-4 flex flex-col justify-end">
+                                            <div className="w-20 h-2 bg-white/10 rounded-full" />
+                                        </div>
+                                        <div className="w-full h-32 bg-white/5 border border-white/5 rounded-3xl p-4 flex flex-col justify-end">
+                                            <div className="w-20 h-2 bg-white/10 rounded-full" />
+                                        </div>
+                                    </div>
+
+                                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0C0C0C] to-transparent z-30" />
 
                                     {/* Floating Stats Overlay */}
                                     <motion.div
                                         animate={{ y: [0, -10, 0] }}
                                         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                        className="absolute bottom-12 -right-8 bg-black/60 backdrop-blur-3xl border border-white/10 p-4 rounded-2xl shadow-2xl flex items-center gap-3"
+                                        className="absolute bottom-16 -right-6 bg-black/80 backdrop-blur-3xl border border-white/10 p-4 rounded-2xl shadow-2xl flex items-center gap-3 z-40"
                                     >
                                         <div className="w-10 h-10 rounded-xl bg-cyber-pink/20 flex items-center justify-center">
                                             <Zap className="w-5 h-5 text-cyber-pink" />
                                         </div>
                                         <div>
-                                            <div className="text-[10px] font-black uppercase text-cyber-pink">System Sync</div>
-                                            <div className="text-white font-black">99.9% Active</div>
+                                            <div className="text-[10px] font-black uppercase text-cyber-pink">Neural Sync</div>
+                                            <div className="text-white font-black">ACTIVE</div>
                                         </div>
                                     </motion.div>
                                 </div>

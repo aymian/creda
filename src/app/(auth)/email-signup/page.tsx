@@ -49,10 +49,11 @@ export default function EmailSignupPage() {
                 email: email,
                 createdAt: serverTimestamp(),
                 focusScore: 100,
-                tier: "pioneer"
+                tier: "pioneer",
+                onboardingCompleted: false
             })
 
-            router.push("/")
+            router.push("/onboarding")
         } catch (err: any) {
             console.error("Signup error:", err)
             let message = "Failed to create account. Please try again."
