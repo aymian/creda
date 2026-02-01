@@ -14,6 +14,9 @@ importers:
       '@mux/mux-player-react':
         specifier: ^3.10.2
         version: 3.10.2(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@paypal/react-paypal-js':
+        specifier: ^8.9.2
+        version: 8.9.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@vidstack/react':
         specifier: ^1.12.0
         version: 1.12.0(@types/react@19.2.10)(react@19.2.3)
@@ -708,6 +711,18 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@paypal/paypal-js@9.2.0':
+    resolution: {integrity: sha512-bYud4/ibSSLsUspruhTrCxuznVY0O23XWwdbI6Wcf45c+1tpYW8BijHJ1/YoWYxslTvJODKHZ8UZWIVkI1pe3g==}
+
+  '@paypal/react-paypal-js@8.9.2':
+    resolution: {integrity: sha512-z1GoA7KAkhFCSmpIsRxe9aseXRvfOMgF6vCJ2Mym0VOSYJm8bZSC3Ui4SjONnglfV8S4P8djpe5QB7FtKsDXrQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17 || ^18 || ^19
+      react-dom: ^16.8.0 || ^17 || ^18 || ^19
+
+  '@paypal/sdk-constants@1.0.157':
+    resolution: {integrity: sha512-BjxWT9rK6dM1AOffSpvHYY47/8BY775jgEYYiwH6eL4YaqU5Epcw7zOtwQ8L4UaEn4FCAjZ2EWxaS83dCN7SpA==}
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -1711,6 +1726,9 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
+  hi-base32@0.5.1:
+    resolution: {integrity: sha512-EmBBpvdYh/4XxsnUybsPag6VikPYnN30td+vQk+GI3qpahVEG9+gTkG0aXVxTjBqQ5T6ijbWIu77O+C5WFWsnA==}
+
   hls-video-element@1.5.10:
     resolution: {integrity: sha512-FruzD03CaQlPlNKfXO1njPbo3jCSImAtFwX1OqgFbMllTQzdYqAHODiWan0q3mr1cYCONOWiAz2/nX+2qHHC+g==}
 
@@ -2267,6 +2285,9 @@ packages:
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
+
+  promise-polyfill@8.3.0:
+    resolution: {integrity: sha512-H5oELycFml5yto/atYqmjyigJoAo3+OXwolYiH7OfQuYlAqhxNvTfiNMbV9hsC6Yp83yE5r2KTVmtrG6R9i6Pg==}
 
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
@@ -3419,6 +3440,21 @@ snapshots:
       fastq: 1.20.1
 
   '@nolyfill/is-core-module@1.0.39': {}
+
+  '@paypal/paypal-js@9.2.0':
+    dependencies:
+      promise-polyfill: 8.3.0
+
+  '@paypal/react-paypal-js@8.9.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@paypal/paypal-js': 9.2.0
+      '@paypal/sdk-constants': 1.0.157
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+
+  '@paypal/sdk-constants@1.0.157':
+    dependencies:
+      hi-base32: 0.5.1
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -4601,6 +4637,8 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
+  hi-base32@0.5.1: {}
+
   hls-video-element@1.5.10:
     dependencies:
       custom-media-element: 1.4.5
@@ -5120,6 +5158,8 @@ snapshots:
       source-map-js: 1.2.1
 
   prelude-ls@1.2.1: {}
+
+  promise-polyfill@8.3.0: {}
 
   prop-types@15.8.1:
     dependencies:

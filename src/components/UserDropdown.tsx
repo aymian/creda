@@ -172,7 +172,7 @@ export function UserDropdown() {
                                         className="w-full bg-gradient-to-r from-cyber-pink to-purple-600 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_20px_rgba(255,45,108,0.2)] flex items-center justify-center gap-2 group/btn"
                                     >
                                         <Crown className="w-3.5 h-3.5 transition-transform group-hover/btn:rotate-12" />
-                                        Ascend to Premium
+                                        Upgrade
                                     </motion.button>
                                 </Link>
                             </div>

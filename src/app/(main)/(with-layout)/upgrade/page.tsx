@@ -16,6 +16,7 @@ import {
     Users
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 
 const PLANS = [
     {
@@ -64,8 +65,14 @@ const COMPARISON = [
 ]
 
 export default function UpgradePage() {
+    const router = useRouter()
     const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly")
-    const [selectedPlan, setSelectedPlan] = useState(PLANS[0]) // Default to Elite
+    const [selectedPlan, setSelectedPlan] = useState(PLANS[0])
+
+    const handleSubscribe = () => {
+        const amount = billingCycle === 'annual' ? Math.floor(selectedPlan.price * 0.8) : selectedPlan.price;
+        router.push(`/payment?id=${selectedPlan.id}&amount=${amount}&cycle=${billingCycle}`);
+    }
 
     return (
         <div className="min-h-screen bg-black text-white selection:bg-cyber-pink/30 pb-40">
@@ -210,7 +217,10 @@ export default function UpgradePage() {
                     </div>
 
                     <div className="flex flex-col items-center gap-4 w-full md:w-auto">
-                        <button className="w-full md:w-[400px] h-14 bg-white text-black rounded-full font-black text-lg hover:opacity-90 transition-all flex items-center justify-center">
+                        <button
+                            onClick={handleSubscribe}
+                            className="w-full md:w-[400px] h-14 bg-white text-black rounded-full font-black text-lg hover:opacity-90 transition-all flex items-center justify-center"
+                        >
                             Subscribe & Pay
                         </button>
                         <p className="text-[10px] text-white/30 text-center max-w-sm font-bold uppercase tracking-wider leading-relaxed">

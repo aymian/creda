@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Loader2 } from "lucide-react"
+import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Loader2, Crown, X } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
 import { useAuth } from "@/context/AuthContext"
 import Link from "next/link"
 import dynamic from 'next/dynamic'
+import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ArrowRight, Star } from "lucide-react"
 
@@ -30,8 +31,18 @@ interface Post {
 
 export default function Home() {
     const { user } = useAuth()
+    const searchParams = useSearchParams()
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
+    const [showPremiumWelcome, setShowPremiumWelcome] = useState(false)
+
+    useEffect(() => {
+        if (searchParams.get('premium') === 'success') {
+            setShowPremiumWelcome(true)
+            const timer = setTimeout(() => setShowPremiumWelcome(false), 8000)
+            return () => clearTimeout(timer)
+        }
+    }, [searchParams])
 
     const handleLike = async (postId: string, currentLikes: string[]) => {
         if (!user) return;
@@ -270,7 +281,41 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0C0C0C] pb-20 pt-8">
+        <div className="min-h-screen bg-[#0C0C0C] pb-20 pt-8 relative">
+            <AnimatePresence>
+                {showPremiumWelcome && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -100 }}
+                        className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] w-full max-w-xl px-4"
+                    >
+                        <div className="bg-gradient-to-r from-cyber-pink to-purple-600 p-[1px] rounded-3xl shadow-[0_0_50px_rgba(255,45,108,0.3)]">
+                            <div className="bg-[#0C0C0C] rounded-[calc(1.5rem-1px)] p-6 flex items-center justify-between gap-6 overflow-hidden relative">
+                                {/* Decor */}
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-cyber-pink/20 rounded-full blur-3xl -z-10" />
+
+                                <div className="flex items-center gap-5">
+                                    <div className="w-14 h-14 bg-cyber-pink/10 rounded-2xl flex items-center justify-center border border-cyber-pink/20">
+                                        <Crown className="w-8 h-8 text-cyber-pink drop-shadow-[0_0_10px_rgba(255,45,108,0.5)]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white">Welcome, VIP Agent!</h3>
+                                        <p className="text-white/60 font-bold text-sm italic">You are now a premium member.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowPremiumWelcome(false)}
+                                    className="p-2 hover:bg-white/5 rounded-xl transition-colors text-white/20 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="max-w-[1800px] mx-auto px-4 md:px-12 space-y-12">
 
                 {/* Empty State */}
