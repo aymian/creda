@@ -22,6 +22,7 @@ import {
     Sparkles,
     AlertCircle
 } from "lucide-react"
+import Link from "next/link"
 
 const GAME_MODES = [
     {
@@ -161,10 +162,10 @@ export default function GamesPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <button className="group w-full md:w-fit px-12 py-5 bg-white text-black rounded-[24px] font-black uppercase tracking-[0.2em] text-[12px] hover:scale-105 active:scale-95 transition-all shadow-[0_20px_40px_rgba(255,255,255,0.1)] flex items-center justify-center gap-4">
+                                <Link href="/games/focus-pool-01" className="group w-full md:w-fit px-12 py-5 bg-white text-black rounded-[24px] font-black uppercase tracking-[0.2em] text-[12px] hover:scale-105 active:scale-95 transition-all shadow-[0_20px_40px_rgba(255,255,255,0.1)] flex items-center justify-center gap-4">
                                     Enter Deep Work Pool
                                     <ChevronRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                                </button>
+                                </Link>
                             </div>
                             <div className="relative min-h-[400px] bg-gradient-to-br from-cyber-pink to-purple-900 border-l border-white/5 overflow-hidden">
                                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />

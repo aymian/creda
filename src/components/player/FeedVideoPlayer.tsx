@@ -57,7 +57,7 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
             if (videoRef.current) videoRef.current.muted = muted;
         };
         globalListeners.add(listener);
-        return () => globalListeners.delete(listener);
+        return () => { globalListeners.delete(listener); };
     }, []);
 
     // Dynamic Quality Logic
@@ -104,12 +104,12 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
 
         const currentTime = videoRef.current?.currentTime || 0;
         setCurrentSrc(newSrc);
-        
+
         if (videoRef.current) {
             const handleLoaded = () => {
                 if (videoRef.current) {
                     videoRef.current.currentTime = currentTime;
-                    if (isPlaying) videoRef.current.play().catch(() => {});
+                    if (isPlaying) videoRef.current.play().catch(() => { });
                     videoRef.current.removeEventListener('loadeddata', handleLoaded);
                 }
             };
