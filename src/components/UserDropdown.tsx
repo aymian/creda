@@ -129,37 +129,54 @@ export function UserDropdown() {
                     >
                         <div className="max-h-[85vh] overflow-y-auto custom-scrollbar">
                             {/* Header Section */}
-                            <div className="flex items-center gap-4 px-5 py-5 hover:bg-white/5 cursor-pointer group/header border-b border-white/5 transition-all">
-                                <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-cyber-pink/20 to-purple-500/20 border-2 border-white/10 group-hover/header:border-cyber-pink/50 transition-all flex items-center justify-center">
-                                    {user.photoURL ? (
-                                        <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full bg-[#1A1A1A] flex items-center justify-center">
-                                            <User className="w-7 h-7 text-white/20" />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-white font-black text-sm uppercase tracking-wider truncate">
-                                        {user.displayName || user.email?.split("@")[0] || "Visionary"}
-                                    </h3>
-                                    <div className="flex items-center gap-4 mt-1.5">
-                                        <div className="flex items-center gap-1.5">
-                                            <Gem className="w-3 h-3 text-white/30" />
-                                            <span className="text-[11px] font-bold text-white/60">0</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Users className="w-3 h-3 text-white/30" />
-                                            <span className="text-[11px] font-bold text-white/60">0</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Star className="w-3 h-3 text-white/30" />
-                                            <span className="text-[11px] font-bold text-white/60">0</span>
+                            <Link href="/profile" onClick={() => setIsOpen(false)}>
+                                <div className="flex items-center gap-4 px-5 py-5 hover:bg-white/5 cursor-pointer group/header border-b border-white/5 transition-all">
+                                    <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-cyber-pink/20 to-purple-500/20 border-2 border-white/10 group-hover/header:border-cyber-pink/50 transition-all flex items-center justify-center">
+                                        {user.photoURL ? (
+                                            <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full bg-[#1A1A1A] flex items-center justify-center">
+                                                <User className="w-7 h-7 text-white/20" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-white font-black text-sm uppercase tracking-wider truncate">
+                                            {user.displayName || user.email?.split("@")[0] || "Visionary"}
+                                        </h3>
+                                        <div className="flex items-center gap-4 mt-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <Gem className="w-3 h-3 text-white/30" />
+                                                <span className="text-[11px] font-bold text-white/60">0</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Users className="w-3 h-3 text-white/30" />
+                                                <span className="text-[11px] font-bold text-white/60">0</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Star className="w-3 h-3 text-white/30" />
+                                                <span className="text-[11px] font-bold text-white/60">0</span>
+                                            </div>
                                         </div>
                                     </div>
+                                    <ChevronRight className="w-5 h-5 text-white/20 group-hover/header:translate-x-1 group-hover/header:text-white transition-all" />
                                 </div>
-                                <ChevronRight className="w-5 h-5 text-white/20 group-hover/header:translate-x-1 group-hover/header:text-white transition-all" />
+                            </Link>
+
+                            {/* Premium CTA */}
+                            <div className="px-5 py-4 border-b border-white/5">
+                                <Link href="/upgrade" onClick={() => setIsOpen(false)}>
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="w-full bg-gradient-to-r from-cyber-pink to-purple-600 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_20px_rgba(255,45,108,0.2)] flex items-center justify-center gap-2 group/btn"
+                                    >
+                                        <Crown className="w-3.5 h-3.5 transition-transform group-hover/btn:rotate-12" />
+                                        Ascend to Premium
+                                    </motion.button>
+                                </Link>
                             </div>
+
 
                             {/* Programs Section */}
                             <div className="py-2">

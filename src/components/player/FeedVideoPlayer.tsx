@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Play,
     Pause,
@@ -20,6 +21,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface FeedVideoPlayerProps {
     src: string;
     poster?: string;
+    autoPlayOnHover?: boolean;
+    minimal?: boolean;
 }
 
 type Quality = 'auto' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p';
@@ -33,7 +36,7 @@ const setGlobalMuted = (muted: boolean) => {
     globalListeners.forEach(listener => listener(muted));
 };
 
-export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
+export function FeedVideoPlayer({ src, poster, autoPlayOnHover, minimal }: FeedVideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +52,43 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
     const [quality, setQuality] = useState<Quality>('auto');
     const [showQualityMenu, setShowQualityMenu] = useState(false);
     const [currentSrc, setCurrentSrc] = useState<string | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    const resetControlsTimer = () => {
+        if (!isFullscreen) {
+            setShowControls(true);
+            return;
+        }
+
+        setShowControls(true);
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+
+        controlsTimeoutRef.current = setTimeout(() => {
+            if (isPlaying) setShowControls(false);
+        }, 3000);
+    };
+
+    useEffect(() => {
+        if (!isFullscreen) {
+            setShowControls(true);
+            return;
+        }
+
+        const handleMouseMove = () => resetControlsTimer();
+        window.addEventListener('mousemove', handleMouseMove);
+        resetControlsTimer();
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        };
+    }, [isFullscreen, isPlaying]);
 
     // Sync with global mute state
     useEffect(() => {
@@ -62,6 +102,22 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
             globalListeners.delete(listener);
         };
     }, []);
+
+    // Handle body overflow and scroll lock in fullscreen
+    useEffect(() => {
+        if (isFullscreen) {
+            document.body.style.overflow = 'hidden';
+            // Also ensure it takes absolute top priority
+            document.documentElement.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+            document.documentElement.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+            document.documentElement.style.overflow = 'unset';
+        };
+    }, [isFullscreen]);
 
     // Dynamic Quality Logic
     useEffect(() => {
@@ -120,9 +176,26 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
         }
     }, [quality, src]);
 
-    // Intersection Observer for Autoplay
+    // Play/Pause on Hover if enabled
     useEffect(() => {
-        if (isFullscreen) return;
+        if (!autoPlayOnHover || isFullscreen) return;
+
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (isHovering) {
+            video.play().catch(() => {
+                video.muted = true;
+                video.play().catch(() => { });
+            });
+        } else {
+            video.pause();
+        }
+    }, [isHovering, autoPlayOnHover, isFullscreen]);
+
+    // Intersection Observer for Autoplay (Now only if NOT autoPlayOnHover)
+    useEffect(() => {
+        if (isFullscreen || autoPlayOnHover) return;
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
@@ -148,7 +221,7 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
         return () => {
             observer.disconnect();
         };
-    }, [src, isFullscreen]);
+    }, [src, isFullscreen, autoPlayOnHover]);
 
     const handleTogglePlay = (e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -196,11 +269,11 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
         setProgress(parseFloat(e.target.value));
     };
 
-    return (
+    const renderPlayer = (
         <div
             ref={containerRef}
             className={`group transition-all duration-500 ${isFullscreen
-                ? 'fixed inset-0 z-[9999] bg-black flex items-center justify-center p-0 md:p-12'
+                ? `fixed inset-0 z-[100000] bg-black flex items-center justify-center p-0 md:p-12 ${(!showControls && isPlaying) ? 'cursor-none' : 'cursor-default'}`
                 : 'relative w-full h-full'
                 }`}
             onMouseEnter={() => setIsHovering(true)}
@@ -209,7 +282,7 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
             {/* Backdrop for Maximize Mode */}
             {isFullscreen && (
                 <div
-                    className="absolute inset-0 bg-black/95 backdrop-blur-2xl -z-10 cursor-pointer"
+                    className="absolute inset-0 bg-black -z-10 cursor-pointer"
                     onClick={() => setIsFullscreen(false)}
                 />
             )}
@@ -231,7 +304,7 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
                         playsInline
                         loop
                         muted={isMuted}
-                        autoPlay
+                        autoPlay={!autoPlayOnHover}
                         preload="auto"
                         onTimeUpdate={() => {
                             const video = videoRef.current;
@@ -262,10 +335,30 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
                     </div>
                 )}
 
+                {/* Minimal Grid Controls */}
+                {minimal && !isFullscreen && isHovering && (
+                    <div className="absolute bottom-4 right-4 z-50 flex items-center gap-2 pointer-events-auto">
+                        <button
+                            onClick={toggleMute}
+                            className="p-2.5 rounded-xl bg-black/50 backdrop-blur-md border border-white/10 text-white hover:bg-cyber-pink/20 hover:text-cyber-pink transition-all shadow-xl"
+                        >
+                            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                        </button>
+                        <button
+                            onClick={toggleFullscreen}
+                            className="p-2.5 rounded-xl bg-black/50 backdrop-blur-md border border-white/10 text-white hover:bg-cyber-pink/20 hover:text-cyber-pink transition-all shadow-xl"
+                        >
+                            <Maximize className="w-5 h-5" />
+                        </button>
+                    </div>
+                )}
+
                 {/* UI Overlay Controls */}
                 <div
-                    className={`absolute inset-0 z-40 flex flex-col justify-between p-6 transition-all duration-500 bg-gradient-to-b from-black/60 via-transparent to-black/80 ${isHovering || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                        }`}
+                    className={`absolute inset-0 z-40 flex flex-col justify-between p-6 transition-all duration-500 bg-gradient-to-b from-black/60 via-transparent to-black/80 ${isFullscreen
+                        ? (showControls || !isPlaying ? 'opacity-100 cursor-default' : 'opacity-0 pointer-events-none cursor-none')
+                        : (isHovering || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none')
+                        } ${minimal && !isFullscreen ? 'hidden' : ''}`}
                 >
                     {/* Header: Timestamp and Close */}
                     <div className="flex justify-between items-start pointer-events-auto">
@@ -362,6 +455,16 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
                     </div>
                 </div>
             </div>
+        </div>
+    );
+
+    return (
+        <div className="relative w-full h-full">
+            {/* Grid Placeholder - maintain space in grid */}
+            {!isFullscreen && renderPlayer}
+
+            {/* Real Player - Portaled when fullscreen to break out of grid transforms */}
+            {isFullscreen && isMounted && createPortal(renderPlayer, document.body)}
         </div>
     );
 }

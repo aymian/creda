@@ -8,6 +8,7 @@ import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUni
 import { useAuth } from "@/context/AuthContext"
 import Link from "next/link"
 import dynamic from 'next/dynamic'
+import { cn } from "@/lib/utils"
 
 // Dynamically import the player component to avoid SSR issues with ReactPlayer
 const FeedVideoPlayer = dynamic(() => import('@/components/player/FeedVideoPlayer').then(mod => mod.FeedVideoPlayer), { ssr: false });
@@ -96,7 +97,7 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-[#0C0C0C] pb-20 pt-8">
-            <div className="max-w-md mx-auto px-4 space-y-8">
+            <div className="max-w-[1800px] mx-auto px-4 md:px-12 space-y-12">
 
                 {/* Empty State */}
                 {posts.length === 0 && !loading && (
@@ -111,123 +112,63 @@ export default function Home() {
                     </div>
                 )}
 
-                {/* Feed */}
-                <AnimatePresence>
-                    {posts.map((post) => (
-                        <motion.div
-                            key={post.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-[#121212] rounded-[40px] overflow-hidden mb-10 shadow-2xl border border-white/5"
-                        >
-                            {/* Header */}
-                            <div className="p-5 flex items-center justify-between">
-                                <Link href={`/${post.authorUsername || 'user'}`} className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-cyber-pink to-purple-600">
-                                        <div className="w-full h-full rounded-full overflow-hidden border-2 border-[#121212] bg-white/10">
-                                            {post.authorPhoto ? (
-                                                <img src={post.authorPhoto} alt={post.authorName} className="w-full h-full object-cover" />
+                {/* Feed Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 mx-auto">
+                    <AnimatePresence>
+                        {posts.map((post) => (
+                            <motion.div
+                                key={post.id}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="relative aspect-[9/16] bg-[#121212] rounded-3xl overflow-hidden group border border-white/5 hover:border-white/20 transition-all shadow-2xl"
+                            >
+                                {/* Media Layer */}
+                                <div className="absolute inset-0 z-0">
+                                    {post.mediaUrl ? (
+                                        <>
+                                            {post.mediaType === 'video' ? (
+                                                <FeedVideoPlayer
+                                                    src={post.mediaUrl || ''}
+                                                    poster={post.mediaUrl?.replace(/\.[^/.]+$/, ".jpg")}
+                                                    autoPlayOnHover={true}
+                                                    minimal={true}
+                                                />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-black text-white text-xs font-black">
-                                                    {post.authorName?.[0] || 'U'}
-                                                </div>
+                                                <img
+                                                    src={post.mediaUrl?.includes('res.cloudinary.com')
+                                                        ? post.mediaUrl.replace('/upload/', '/upload/w_600,c_fill,q_auto,f_auto/')
+                                                        : post.mediaUrl
+                                                    }
+                                                    alt="Post media"
+                                                    className="w-full h-full object-cover"
+                                                    loading="lazy"
+                                                />
                                             )}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h3 className="font-black text-white text-[16px] leading-tight hover:text-cyber-pink transition-colors">
-                                            {post.authorName || post.authorUsername || 'Anonymous'}
-                                        </h3>
-                                        <p className="text-white/40 text-xs font-bold tracking-tight">@{post.authorUsername?.toLowerCase() || 'user'}</p>
-                                    </div>
-                                </Link>
-                                <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/20" />
-                            </div>
-
-                            {/* Media Section with Content Overlay */}
-                            <div className="relative w-full aspect-[4/5] bg-black overflow-hidden group">
-                                {post.mediaUrl ? (
-                                    <>
-                                        {post.mediaType === 'video' ? (
-                                            <FeedVideoPlayer
-                                                src={post.mediaUrl || ''}
-                                                poster={post.mediaUrl?.replace(/\.[^/.]+$/, ".jpg")}
-                                            />
-                                        ) : (
-                                            <img
-                                                src={post.mediaUrl?.includes('res.cloudinary.com')
-                                                    ? post.mediaUrl.replace('/upload/', '/upload/w_800,c_fill,q_auto,f_auto/')
-                                                    : post.mediaUrl
-                                                }
-                                                alt="Post media"
-                                                className="w-full h-full object-cover"
-                                                loading="lazy"
-                                            />
-                                        )}
-                                        {/* Content Overlay - matches reference style */}
-                                        <div className="absolute bottom-0 inset-x-0 p-6 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
-                                            <p className="text-xl font-black text-white leading-tight drop-shadow-lg">
-                                                {post.content}
+                                        </>
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center p-6 bg-gradient-to-br from-cyber-pink/20 to-purple-900/40">
+                                            <p className="text-lg font-black text-center text-white italic opacity-40">
+                                                "{post.content}"
                                             </p>
                                         </div>
-                                    </>
-                                ) : (
-                                    <div className="w-full aspect-video flex items-center justify-center p-8 bg-gradient-to-br from-cyber-pink/20 to-purple-900/40">
-                                        <p className="text-2xl font-black text-center text-white italic">
-                                            "{post.content}"
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Footer / Actions */}
-                            <div className="px-6 py-5">
-                                <div className="flex items-center gap-6 mb-4">
-                                    <button
-                                        onClick={() => handleLike(post.id, Array.isArray(post.likes) ? post.likes : [])}
-                                        className={`transition-all active:scale-75 ${user && Array.isArray(post.likes) && post.likes.includes(user.uid)
-                                                ? 'text-cyber-pink drop-shadow-[0_0_8px_rgba(255,45,108,0.5)]'
-                                                : 'text-white hover:text-white/80'
-                                            }`}
-                                    >
-                                        <Heart
-                                            className={`w-7 h-7 stroke-[2px] ${user && Array.isArray(post.likes) && post.likes.includes(user.uid) ? 'fill-cyber-pink' : 'fill-transparent'
-                                                }`}
-                                        />
-                                    </button>
-                                    <button className="text-white transition-transform active:scale-90">
-                                        <MessageCircle className="w-7 h-7 stroke-[1.5px]" />
-                                    </button>
-                                    <button className="text-white transition-transform active:scale-90">
-                                        <Share2 className="w-7 h-7 stroke-[1.5px]" />
-                                    </button>
+                                    )}
                                 </div>
 
-                                {/* Stats & Caption Style */}
-                                <div className="space-y-1">
-                                    <div className="font-extrabold text-[15px] text-white">
-                                        {(Array.isArray(post.likes) ? post.likes.length : 0).toLocaleString()} likes
-                                    </div>
-                                    <div className="text-[14px]">
-                                        <span className="font-black text-white mr-2">@{post.authorUsername?.toLowerCase() || 'user'}</span>
-                                        <span className="text-white/60 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                                            {(post.content || "").length > 50 ? post.content.substring(0, 50) + "..." : post.content}
-                                        </span>
-                                    </div>
+                                {/* Top Overlay: Views */}
+                                <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-black/20 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                                    <Play className="w-3 h-3 text-white fill-white" />
+                                    <span className="text-[11px] font-black text-white">
+                                        {Math.floor(Math.random() * 50) + 1}
+                                    </span>
                                 </div>
 
-                                <div className="mt-3 flex items-center justify-between">
-                                    <div className="text-white/20 text-[10px] uppercase font-bold tracking-[0.2em]">
-                                        {post.createdAt?.toDate ? timeAgo(post.createdAt.toDate()) : 'JUST NOW'}
-                                    </div>
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))
-                    }
-                </AnimatePresence >
-            </div >
-        </div >
+                                {/* Bottom Overlay: Points (Removed as per request) */}
+                                <div className="absolute bottom-0 inset-x-0 z-20 p-3 pt-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+            </div>
+        </div>
     )
 }
