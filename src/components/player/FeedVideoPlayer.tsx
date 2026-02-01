@@ -54,10 +54,13 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
     useEffect(() => {
         const listener = (muted: boolean) => {
             setIsMuted(muted);
-            if (videoRef.current) videoRef.current.muted = muted;
+            const video = videoRef.current;
+            if (video) video.muted = muted;
         };
         globalListeners.add(listener);
-        return () => { globalListeners.delete(listener); };
+        return () => {
+            globalListeners.delete(listener);
+        };
     }, []);
 
     // Dynamic Quality Logic
@@ -142,7 +145,9 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
             { threshold: 0.4 }
         );
         if (containerRef.current) observer.observe(containerRef.current);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+        };
     }, [src, isFullscreen]);
 
     const handleTogglePlay = (e?: React.MouseEvent) => {
