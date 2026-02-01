@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
     ArrowRight,
@@ -16,12 +16,28 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { Loader2 } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 
 export default function SignupPage() {
     const [activeTab, setActiveTab] = useState<"login" | "join">("join")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
     const router = useRouter()
+    const { user, loading: authLoading } = useAuth()
+
+    useEffect(() => {
+        if (!authLoading && user) {
+            router.push("/")
+        }
+    }, [user, authLoading, router])
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-[#0C0C0C] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-cyber-pink" />
+            </div>
+        )
+    }
 
     const handleGoogleSignup = async () => {
         setIsLoading(true)

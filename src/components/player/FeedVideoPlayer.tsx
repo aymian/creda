@@ -48,7 +48,7 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
     // Quality Selection State
     const [quality, setQuality] = useState<Quality>('auto');
     const [showQualityMenu, setShowQualityMenu] = useState(false);
-    const [currentSrc, setCurrentSrc] = useState('');
+    const [currentSrc, setCurrentSrc] = useState<string | null>(null);
 
     // Sync with global mute state
     useEffect(() => {
@@ -91,15 +91,25 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
             }
         }
 
-        const newSrc = src.replace('/upload/', `/upload/${transform}/`);
+        // Precise Cloudinary URL injection
+        let newSrc = src;
+        if (src.includes('res.cloudinary.com')) {
+            // Find the /upload/ part and insert transformation after it, but before the version/id
+            const uploadPart = '/upload/';
+            const parts = src.split(uploadPart);
+            if (parts.length === 2) {
+                newSrc = `${parts[0]}${uploadPart}${transform}/${parts[1]}`;
+            }
+        }
+
         const currentTime = videoRef.current?.currentTime || 0;
         setCurrentSrc(newSrc);
-
+        
         if (videoRef.current) {
             const handleLoaded = () => {
                 if (videoRef.current) {
                     videoRef.current.currentTime = currentTime;
-                    if (isPlaying) videoRef.current.play();
+                    if (isPlaying) videoRef.current.play().catch(() => {});
                     videoRef.current.removeEventListener('loadeddata', handleLoaded);
                 }
             };
@@ -185,8 +195,8 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
         <div
             ref={containerRef}
             className={`group transition-all duration-500 ${isFullscreen
-                    ? 'fixed inset-0 z-[9999] bg-black flex items-center justify-center p-0 md:p-12'
-                    : 'relative w-full h-full'
+                ? 'fixed inset-0 z-[9999] bg-black flex items-center justify-center p-0 md:p-12'
+                : 'relative w-full h-full'
                 }`}
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => { setIsHovering(false); setShowQualityMenu(false); }}
@@ -208,27 +218,37 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
                     </div>
                 )}
 
-                <video
-                    ref={videoRef}
-                    src={currentSrc}
-                    poster={poster || src.replace(/\.[^/.]+$/, ".jpg")}
-                    playsInline
-                    loop
-                    muted={isMuted}
-                    autoPlay
-                    preload="auto"
-                    onTimeUpdate={() => setProgress((videoRef.current!.currentTime / videoRef.current!.duration) * 100)}
-                    onLoadedMetadata={() => setIsMetadataLoaded(true)}
-                    onWaiting={() => setIsLoading(true)}
-                    onCanPlay={() => {
-                        setIsLoading(false);
-                        setIsMetadataLoaded(true);
-                    }}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    className={`w-full h-full ${isFullscreen ? 'object-contain' : 'object-cover'} transition-opacity duration-500 ${isMetadataLoaded ? 'opacity-100' : 'opacity-0'}`}
-                    onClick={() => handleTogglePlay()}
-                />
+                {currentSrc && (
+                    <video
+                        ref={videoRef}
+                        src={currentSrc}
+                        poster={poster || (src.includes('res.cloudinary.com') ? src.replace(/\.[^/.]+$/, ".jpg") : undefined)}
+                        playsInline
+                        loop
+                        muted={isMuted}
+                        autoPlay
+                        preload="auto"
+                        onTimeUpdate={() => {
+                            const video = videoRef.current;
+                            if (video && video.duration > 0) {
+                                setProgress((video.currentTime / video.duration) * 100);
+                            }
+                        }}
+                        onLoadedMetadata={() => {
+                            setIsMetadataLoaded(true);
+                            setIsLoading(false);
+                        }}
+                        onWaiting={() => setIsLoading(true)}
+                        onCanPlay={() => {
+                            setIsLoading(false);
+                            setIsMetadataLoaded(true);
+                        }}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        className={`w-full h-full ${isFullscreen ? 'object-contain' : 'object-cover'} transition-opacity duration-500 ${isMetadataLoaded ? 'opacity-100' : 'opacity-0'}`}
+                        onClick={() => handleTogglePlay()}
+                    />
+                )}
 
                 {/* Buffer Overlay */}
                 {isLoading && isMetadataLoaded && (
@@ -286,7 +306,7 @@ export function FeedVideoPlayer({ src, poster }: FeedVideoPlayerProps) {
                                 type="range"
                                 min="0"
                                 max="100"
-                                value={progress}
+                                value={isNaN(progress) ? 0 : progress}
                                 step="0.1"
                                 onChange={handleProgressChange}
                                 onClick={(e) => e.stopPropagation()}

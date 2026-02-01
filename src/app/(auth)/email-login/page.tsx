@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
     Mail,
@@ -16,6 +16,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { useAuth } from "@/context/AuthContext"
 
 export default function EmailLoginPage() {
     const [email, setEmail] = useState("")
@@ -23,6 +24,21 @@ export default function EmailLoginPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
     const router = useRouter()
+    const { user, loading: authLoading } = useAuth()
+
+    useEffect(() => {
+        if (!authLoading && user) {
+            router.push("/")
+        }
+    }, [user, authLoading, router])
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-[#0C0C0C] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-cyber-pink" />
+            </div>
+        )
+    }
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, use } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, getCountFromServer } from "firebase/firestore"
@@ -35,8 +35,8 @@ interface UserProfile {
     createdAt?: any
 }
 
-export default function ProfilePage() {
-    const params = useParams()
+export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+    const resolvedParams = use(params)
     const router = useRouter()
     const { user: currentUser } = useAuth()
     const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -47,7 +47,7 @@ export default function ProfilePage() {
         type: "followers"
     })
 
-    const username = params?.username as string
+    const username = resolvedParams?.username as string
 
     useEffect(() => {
         const fetchProfile = async () => {

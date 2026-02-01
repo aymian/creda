@@ -163,12 +163,16 @@ export function UserDropdown() {
 
                             {/* Programs Section */}
                             <div className="py-2">
-                                <MenuItem icon={Dices} label="Games" />
+                                <Link href="/games">
+                                    <MenuItem icon={Dices} label="Games" />
+                                </Link>
 
                                 <div className="px-5 py-3 border-t border-white/5">
                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Settings</span>
                                 </div>
-                                <MenuItem icon={Settings} label="Settings" />
+                                <Link href="/settings">
+                                    <MenuItem icon={Settings} label="Settings" />
+                                </Link>
                                 <ToggleMenuItem icon={Moon} label="Dark theme" />
 
                                 <div className="px-5 py-3 border-t border-white/5">
@@ -181,7 +185,9 @@ export function UserDropdown() {
                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Special Programs</span>
                                 </div>
                                 <MenuItem icon={UsersRound} label="Agency Program" />
-                                <MenuItem icon={Crown} label="VIP Loyalty" />
+                                <Link href="/wallet">
+                                    <MenuItem icon={Crown} label="VIP Loyalty" />
+                                </Link>
                                 <MenuItem icon={Store} label="MyVIP Store" badge={true} />
                                 <MenuItem icon={GraduationCap} label="How to Creda" badge={true} />
                                 <MenuItem icon={Gavel} label="Creda Cards Auction" />

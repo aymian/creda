@@ -30,6 +30,18 @@ import { uploadToCloudinary } from "@/lib/cloudinary"
 type CreateType = 'story' | 'post' | 'thread' | 'live' | 'lice' // 'lice' mapped to generic/clip if found
 
 export default function CreatePage() {
+    return (
+        <React.Suspense fallback={
+            <div className="min-h-screen bg-[#0C0C0C] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyber-pink" />
+            </div>
+        }>
+            <CreateContent />
+        </React.Suspense>
+    )
+}
+
+function CreateContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { user } = useAuth()
@@ -288,7 +300,7 @@ export default function CreatePage() {
                                     {/* Thread Item 1 */}
                                     <div className="relative">
                                         <div className="absolute -left-[41px] top-0 w-10 h-10 rounded-full bg-white/10 overflow-hidden ring-4 ring-[#0C0C0C]">
-                                            {user?.photoURL ? <img src={user.photoURL} className="w-full h-full object-cover" /> : null}
+                                            {user?.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover" /> : null}
                                         </div>
                                         <div className="space-y-2">
                                             <h4 className="text-sm font-bold text-white mb-1">Start thread...</h4>

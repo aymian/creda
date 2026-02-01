@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
     Mail,
@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
+import { useAuth } from "@/context/AuthContext"
 
 export default function EmailSignupPage() {
     const [username, setUsername] = useState("")
@@ -26,6 +27,21 @@ export default function EmailSignupPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
     const router = useRouter()
+    const { user, loading: authLoading } = useAuth()
+
+    useEffect(() => {
+        if (!authLoading && user) {
+            router.push("/")
+        }
+    }, [user, authLoading, router])
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-[#0C0C0C] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-cyber-pink" />
+            </div>
+        )
+    }
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault()

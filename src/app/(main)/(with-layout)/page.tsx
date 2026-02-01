@@ -184,14 +184,14 @@ export default function Home() {
                             <div className="px-6 py-5">
                                 <div className="flex items-center gap-6 mb-4">
                                     <button
-                                        onClick={() => handleLike(post.id, post.likes || [])}
-                                        className={`transition-all active:scale-75 ${user && post.likes?.includes(user.uid)
+                                        onClick={() => handleLike(post.id, Array.isArray(post.likes) ? post.likes : [])}
+                                        className={`transition-all active:scale-75 ${user && Array.isArray(post.likes) && post.likes.includes(user.uid)
                                                 ? 'text-cyber-pink drop-shadow-[0_0_8px_rgba(255,45,108,0.5)]'
                                                 : 'text-white hover:text-white/80'
                                             }`}
                                     >
                                         <Heart
-                                            className={`w-7 h-7 stroke-[2px] ${user && post.likes?.includes(user.uid) ? 'fill-cyber-pink' : 'fill-transparent'
+                                            className={`w-7 h-7 stroke-[2px] ${user && Array.isArray(post.likes) && post.likes.includes(user.uid) ? 'fill-cyber-pink' : 'fill-transparent'
                                                 }`}
                                         />
                                     </button>
@@ -206,7 +206,7 @@ export default function Home() {
                                 {/* Stats & Caption Style */}
                                 <div className="space-y-1">
                                     <div className="font-extrabold text-[15px] text-white">
-                                        {(post.likes?.length || 0).toLocaleString()} likes
+                                        {(Array.isArray(post.likes) ? post.likes.length : 0).toLocaleString()} likes
                                     </div>
                                     <div className="text-[14px]">
                                         <span className="font-black text-white mr-2">@{post.authorUsername?.toLowerCase() || 'user'}</span>
