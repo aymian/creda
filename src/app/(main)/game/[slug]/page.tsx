@@ -32,7 +32,7 @@ import { TypingGame } from "@/components/game/TypingGame"
 import { PuzzleGame } from "@/components/game/PuzzleGame"
 import { useAuth } from "@/context/AuthContext"
 import { db } from "@/lib/firebase"
-import { doc, onSnapshot, updateDoc, increment, setDoc, getDoc, serverTimestamp } from "firebase/firestore"
+import { doc, onSnapshot, updateDoc, increment, setDoc, getDoc, serverTimestamp, addDoc, collection } from "firebase/firestore"
 
 type Currency = 'FRW' | 'USD' | 'EUR';
 
@@ -189,7 +189,7 @@ export default function GameInstancePage() {
     }
 
     const startCountdown = () => {
-        let count = 5
+        let count = 10
         setPreStartTimer(count)
         const interval = setInterval(() => {
             count -= 1
@@ -265,8 +265,18 @@ export default function GameInstancePage() {
 
             if (user.uid === winnerId) {
                 const payout = d.pool * 0.8; // 20% fee
+                const platformFee = d.pool * 0.2;
+
                 await updateDoc(doc(db, "users", winnerId), {
                     balance: increment(payout)
+                })
+
+                // Log Earnings
+                await addDoc(collection(db, "earnings"), {
+                    type: "game_payout",
+                    matchId: matchDocId,
+                    amount: platformFee,
+                    createdAt: serverTimestamp()
                 })
             }
         }
@@ -290,86 +300,117 @@ export default function GameInstancePage() {
                 <AnimatePresence mode="wait">
 
                     {gameState === "lobby" && (
-                        <motion.div key="lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto">
+                        <motion.div key="lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-6xl mx-auto">
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                                {/* Left Side: Terminal Info */}
                                 <div className="space-y-8">
                                     <div className="flex items-center gap-3">
                                         <QrCode className="w-6 h-6 text-cyber-pink" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-cyber-pink">Live Terminal Sync</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-cyber-pink">Universal Neural terminal sync</span>
                                     </div>
-                                    <h1 className="text-6xl font-black uppercase tracking-tighter italic">Match <span className="text-cyber-pink">Terminal</span></h1>
+                                    <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter italic leading-none">Arcade <span className="text-cyber-pink text-transparent bg-clip-text bg-gradient-to-r from-cyber-pink to-purple-600">Lobby</span></h1>
+                                    <p className="text-white/40 text-sm max-w-sm italic leading-relaxed">
+                                        Skill-based protocol active. Winner claims 80% of the total neural pool. 20% protocol rake applied automatically.
+                                    </p>
 
-                                    <div className="space-y-6">
-                                        <p className="text-white/40 text-sm">Define your stakes. Your opponent must match this amount to join.</p>
-
-                                        {!isReceiver && (
-                                            <div className="p-8 bg-white/5 border border-white/10 rounded-[40px] space-y-6">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Entry Stake</span>
-                                                    <div className="flex gap-2">
-                                                        {(['FRW', 'USD', 'EUR'] as Currency[]).map(c => (
-                                                            <button
-                                                                key={c}
-                                                                onClick={() => updateStake(stakeAmount, c)}
-                                                                className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${stakeCurrency === c ? 'bg-cyber-pink text-white shadow-[0_0_20px_rgba(255,45,108,0.3)]' : 'bg-white/5 text-white/20'}`}
-                                                            >
-                                                                {c}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                <div className="relative">
-                                                    <input
-                                                        type="number"
-                                                        value={stakeAmount}
-                                                        onChange={(e) => updateStake(parseInt(e.target.value) || 0, stakeCurrency)}
-                                                        className="w-full bg-black/40 border-2 border-white/5 rounded-3xl py-6 px-8 text-3xl font-black text-white outline-none focus:border-cyber-pink transition-all"
-                                                    />
-                                                    <div className="absolute right-8 top-1/2 -translate-y-1/2 text-white/20 font-black">
-                                                        {stakeCurrency === 'FRW' ? 'FRW' : stakeCurrency === 'USD' ? <DollarSign /> : <Euro />}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex justify-between text-[10px] font-black text-white/20 uppercase tracking-widest">
-                                                    <span>Min: {stakeCurrency === 'FRW' ? '1000' : '1'}</span>
-                                                    <span>Max: {stakeCurrency === 'FRW' ? '10M' : '10K'}</span>
+                                    {/* STAKE LOGIC */}
+                                    {!isReceiver ? (
+                                        <div className="bg-[#0C0C0C] border border-white/5 rounded-[40px] p-8 space-y-6">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Adjust wager</span>
+                                                <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                                                    {(['FRW', 'USD', 'EUR'] as Currency[]).map(c => (
+                                                        <button
+                                                            key={c}
+                                                            onClick={() => updateStake(stakeAmount, c)}
+                                                            className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stakeCurrency === c ? 'bg-white text-black' : 'text-white/20 hover:text-white'}`}
+                                                        >
+                                                            {c}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
-                                        )}
-
-                                        {isReceiver && (
-                                            <div className="p-8 bg-cyber-pink/5 border border-cyber-pink/20 rounded-[40px] space-y-3">
-                                                <div className="flex justify-between text-[10px] font-black text-cyber-pink uppercase tracking-widest"><span>Staked Amount</span><span className="text-white">{stakeAmount} {stakeCurrency}</span></div>
-                                                <div className="flex justify-between text-[10px] font-black text-cyber-pink uppercase tracking-widest"><span>Winner's Pot (80%)</span><span className="text-green-400">{(stakeAmount * 2 * 0.8).toLocaleString()} {stakeCurrency}</span></div>
+                                            <div className="relative">
+                                                <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black italic text-cyber-pink text-xl">{stakeCurrency}</div>
+                                                <input
+                                                    type="number"
+                                                    value={stakeAmount}
+                                                    onChange={(e) => updateStake(Number(e.target.value), stakeCurrency)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-3xl py-6 pl-20 pr-8 text-3xl font-black italic outline-none focus:border-cyber-pink/50 transition-all"
+                                                />
                                             </div>
-                                        )}
-                                    </div>
+                                            <div className="flex justify-between px-2 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                                                <span>Min: {stakeCurrency === 'FRW' ? '1,000' : '1'}</span>
+                                                <span>Max: {stakeCurrency === 'FRW' ? '10M' : '10,000'}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-cyber-pink/5 border border-cyber-pink/20 rounded-[40px] p-10 space-y-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-cyber-pink animate-pulse" />
+                                                <span className="text-[10px] font-black uppercase text-cyber-pink tracking-widest">Enforced match stake</span>
+                                            </div>
+                                            <h3 className="text-5xl font-black italic">{stakeCurrency} {stakeAmount.toLocaleString()}</h3>
+                                            <div className="h-px bg-cyber-pink/10 w-full" />
+                                            <div className="flex justify-between text-[10px] font-bold text-white/40 uppercase">
+                                                <span>Potential Payout</span>
+                                                <span className="text-green-500">{(stakeAmount * 2 * 0.8).toLocaleString()} {stakeCurrency}</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="bg-[#111] border border-white/10 rounded-[40px] p-10 space-y-10">
-                                    <div className="text-center space-y-4">
-                                        <p className="text-[10px] font-black uppercase text-white/20">Your Identity Code</p>
-                                        <div className="flex items-center justify-center gap-3">
-                                            {accessCode.split("").map((digit, i) => (
-                                                <div key={i} className="w-10 h-14 bg-black/40 border-2 border-white/10 rounded-xl flex items-center justify-center text-2xl font-black italic text-cyber-pink shadow-[0_0_20px_rgba(255,45,108,0.1)]">
-                                                    {digit}
+                                {/* Right Side: Connection Panel */}
+                                <div className="bg-[#0C0C0C] border border-white/10 rounded-[50px] p-12 space-y-10 shadow-[0_0_100px_rgba(255,45,108,0.05)]">
+                                    {!isReceiver ? (
+                                        <div className="text-center space-y-10">
+                                            <div className="space-y-4">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Identity Access Code</p>
+                                                <div className="flex justify-center gap-3">
+                                                    {accessCode.split('').map((char, i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            initial={{ scale: 0.8, opacity: 0 }}
+                                                            animate={{ scale: 1, opacity: 1 }}
+                                                            transition={{ delay: i * 0.1 }}
+                                                            className="w-12 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-3xl font-black italic text-cyber-pink"
+                                                        >
+                                                            {char}
+                                                        </motion.div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            </div>
+                                            <div className="p-8 bg-white/[0.02] border border-white/5 rounded-[40px] space-y-4">
+                                                <Activity className="w-6 h-6 text-white/10 mx-auto" />
+                                                <p className="text-xs text-white/40 font-medium italic leading-relaxed">
+                                                    Deploy this code to your opponent. The session will initialize the moment they match your identity fingerprint.
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <input
-                                            type="text"
-                                            maxLength={6}
-                                            placeholder="ENTER RECEIVED CODE"
-                                            value={inputCode}
-                                            onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                                            className="w-full bg-black/40 border-2 border-white/5 rounded-3xl py-6 text-center text-xl font-black tracking-[0.3em] outline-none focus:border-cyber-pink/50 transition-all placeholder:text-white/5"
-                                        />
-                                        <button onClick={handleJoinWithCode} className="w-full py-6 bg-white text-black rounded-[32px] font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-all">Initialize Connection</button>
-                                    </div>
+                                    ) : (
+                                        <div className="space-y-8">
+                                            <div className="space-y-4 text-center">
+                                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-white/10">
+                                                    <Lock className="w-6 h-6 text-white/40" />
+                                                </div>
+                                                <h3 className="text-xl font-black uppercase italic italic tracking-tighter">Enter Identity Code</h3>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                value={inputCode}
+                                                onChange={(e) => setInputCode(e.target.value)}
+                                                className="w-full bg-black/40 border-2 border-white/5 rounded-3xl py-8 text-center text-4xl font-black tracking-[0.4em] outline-none focus:border-cyber-pink transition-all placeholder:text-white/5"
+                                                placeholder="000000"
+                                            />
+                                            <button
+                                                onClick={handleJoinWithCode}
+                                                className="w-full py-6 bg-white text-black rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs hover:bg-cyber-pink hover:text-white transition-all shadow-xl active:scale-95"
+                                            >
+                                                Initialize Neuro-Bridge
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>

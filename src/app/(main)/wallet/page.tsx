@@ -18,6 +18,7 @@ import {
     Smartphone,
     ArrowRight
 } from "lucide-react"
+import Link from "next/link"
 import { useAuth } from "@/context/AuthContext"
 import { db } from "@/lib/firebase"
 import { doc, onSnapshot, updateDoc, collection, query, where, getDocs } from "firebase/firestore"
@@ -314,14 +315,14 @@ export default function WalletPage() {
 
                         {/* Bottom Deposit/Withdraw Buttons */}
                         <div className="grid grid-cols-2 gap-4">
-                            <button className="flex items-center justify-center gap-3 py-5 bg-[#111] border border-white/5 rounded-3xl hover:bg-white/10 transition-all group">
+                            <Link href="/deposit" className="flex items-center justify-center gap-3 py-5 bg-[#111] border border-white/5 rounded-3xl hover:bg-white/10 transition-all group">
                                 <ArrowDownCircle className="w-5 h-5 text-[#C19A3B] group-hover:scale-110 transition-transform" />
                                 <span className="font-black uppercase text-xs tracking-widest">Deposit</span>
-                            </button>
-                            <button className="flex items-center justify-center gap-3 py-5 bg-[#111] border border-white/5 rounded-3xl hover:bg-white/10 transition-all group">
+                            </Link>
+                            <Link href="/withdraw" className="flex items-center justify-center gap-3 py-5 bg-[#111] border border-white/5 rounded-3xl hover:bg-white/10 transition-all group">
                                 <ArrowUpCircle className="w-5 h-5 text-[#C19A3B] group-hover:scale-110 transition-transform" />
                                 <span className="font-black uppercase text-xs tracking-widest">Withdraw</span>
-                            </button>
+                            </Link>
                         </div>
                     </div>
 
@@ -343,10 +344,10 @@ export default function WalletPage() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <button className="flex items-center justify-center gap-3 py-6 bg-[#111]/50 border border-white/5 rounded-3xl hover:bg-[#C19A3B] hover:text-black transition-all group overflow-hidden relative">
+                                <Link href="/send" className="flex items-center justify-center gap-3 py-6 bg-[#111]/50 border border-white/5 rounded-3xl hover:bg-[#C19A3B] hover:text-black transition-all group overflow-hidden relative">
                                     <Send className="w-4 h-4 text-[#C19A3B] group-hover:text-black transition-colors" />
                                     <span className="font-black uppercase text-[11px] tracking-widest">Send</span>
-                                </button>
+                                </Link>
                                 <button className="flex items-center justify-center gap-3 py-6 bg-[#111]/50 border border-white/5 rounded-3xl hover:bg-[#C19A3B] hover:text-black transition-all group">
                                     <ArrowDownCircle className="w-4 h-4 text-[#C19A3B] rotate-180 group-hover:text-black transition-colors" />
                                     <span className="font-black uppercase text-[11px] tracking-widest">Receive</span>

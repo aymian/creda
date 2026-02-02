@@ -13,14 +13,6 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
     
-    // Users collection
-    match /users/{userId} {
-      // Anyone can read user profiles (for displaying names, avatars, etc.)
-      allow read: if true;
-      // Only the user can write their own profile
-      allow write: if isSignedIn() && isOwner(userId);
-    }
-    
     // Conversations collection
     match /conversations/{conversationId} {
       // Users can read conversations they're part of
@@ -114,18 +106,40 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isOwner(resource.data.userId);
     }
 
+    // Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     // Arcade Matches collection
     match /matches/{matchId} {
-      // Allows users to read any match for joining/syncing
       allow read: if isSignedIn();
-      // Allows users to create a new match lobby
       allow create: if isSignedIn();
-      // Allows the sender or receiver of the match to update the document (scores, status, etc)
-      allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.senderId || 
-        request.auth.uid == request.resource.data.receiverId ||
-        request.auth.uid == resource.data.receiverId
-      );
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Deposits collection
+    match /deposits/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Withdrawals collection
+    match /withdrawals/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Earnings tracking
+    match /earnings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
   }
 }

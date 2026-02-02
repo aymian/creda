@@ -32,6 +32,20 @@ import { Header } from "@/components/header"
 // Game definitions
 const AVAILABLE_GAMES = [
     {
+        id: "logic-puzzle",
+        slug: "logic-puzzle",
+        title: "Logic Puzzle Race",
+        description: "Reorder the neural grid in record time. Slide tiles 1-8 to fix the logic sequence. Pure efficiency calculation.",
+        icon: Puzzle,
+        color: "text-green-400",
+        bgColor: "bg-green-400/10",
+        borderColor: "border-green-400/20",
+        difficulty: "Professional",
+        duration: "1-2min",
+        priority: true,
+        features: ["8-Puzzle Mechanics", "Algorithmic Audit", "Instant Payout"]
+    },
+    {
         id: "reaction-speed",
         slug: "reaction-speed",
         title: "Reaction Speed Duel",
@@ -86,20 +100,6 @@ const AVAILABLE_GAMES = [
         duration: "60s",
         priority: true,
         features: ["WPM Tracking", "Input Analysis", "Global Standard"]
-    },
-    {
-        id: "logic-puzzle",
-        slug: "logic-puzzle",
-        title: "Logic Puzzle Race",
-        description: "Sequence completion and logic block races. First one to solve the pattern sequence wins.",
-        icon: Puzzle,
-        color: "text-green-400",
-        bgColor: "bg-green-400/10",
-        borderColor: "border-green-400/20",
-        difficulty: "Strategic",
-        duration: "1-2min",
-        priority: true,
-        features: ["8-Puzzle Solver", "Puzzle Set Hash", "Audit Logged"]
     }
 ]
 
