@@ -18,17 +18,24 @@ import {
     Timer,
     AlertCircle,
     Activity,
-    Wifi
+    Wifi,
+    Wallet,
+    X,
+    CreditCard
 } from "lucide-react"
 import { Header } from "@/components/header"
 import { ReactionGame } from "@/components/game/ReactionGame"
 import { MathGame } from "@/components/game/MathGame"
 import { TypingGame } from "@/components/game/TypingGame"
+import { useAuth } from "@/context/AuthContext"
+import { db } from "@/lib/firebase"
+import { doc, onSnapshot, updateDoc, increment } from "firebase/firestore"
 
 export default function GameInstancePage() {
     const { slug } = useParams()
     const searchParams = useSearchParams()
     const router = useRouter()
+    const { user } = useAuth()
 
     // Game Flow States
     const [gameState, setGameState] = useState<"lobby" | "connecting" | "matchmaking" | "playing" | "payout">("lobby")
@@ -37,6 +44,21 @@ export default function GameInstancePage() {
     const [timeLeft, setTimeLeft] = useState(600) // 10 minutes in seconds
     const [inputCode, setInputCode] = useState("")
     const [connectionProgress, setConnectionProgress] = useState(0)
+
+    // Wallet States
+    const [balance, setBalance] = useState(0)
+    const [showTopUpModal, setShowTopUpModal] = useState(false)
+
+    // Sync Balance
+    useEffect(() => {
+        if (!user) return
+        const unsub = onSnapshot(doc(db, "users", user.uid), (doc) => {
+            if (doc.exists()) {
+                setBalance(doc.data().balance || 0)
+            }
+        })
+        return () => unsub()
+    }, [user])
 
     // Generate code on mount
     useEffect(() => {
@@ -52,9 +74,6 @@ export default function GameInstancePage() {
             }, 1000)
             return () => clearInterval(timer)
         }
-        if (timeLeft === 0) {
-            // Expire logic
-        }
     }, [timeLeft, gameState])
 
     const formatTime = (seconds: number) => {
@@ -64,11 +83,39 @@ export default function GameInstancePage() {
     }
 
     const startConnection = () => {
+        if (balance < 1000) {
+            setShowTopUpModal(true)
+            return
+        }
         setGameState("connecting")
     }
 
-    const handleCodeSubmit = () => {
-        // Simulate connecting logic
+    const handleSimulatorJoin = () => {
+        if (balance < 1000) {
+            setShowTopUpModal(true)
+            return
+        }
+        // Simulation: Sender also enters connecting state
+        handleCodeSubmit()
+    }
+
+    const handleCodeSubmit = async () => {
+        if (balance < 1000) {
+            setShowTopUpModal(true)
+            return
+        }
+
+        // Deduct Funds logic
+        if (user) {
+            try {
+                await updateDoc(doc(db, "users", user.uid), {
+                    balance: increment(-1000)
+                })
+            } catch (e) {
+                console.error("Deduction failed", e)
+            }
+        }
+
         setGameState("matchmaking")
         let progress = 0
         const interval = setInterval(() => {
@@ -78,14 +125,24 @@ export default function GameInstancePage() {
                 clearInterval(interval)
                 setTimeout(() => setGameState("playing"), 500)
             }
-        }, 150)
+        }, 120)
     }
 
     // Handle game completion
-    const onGameComplete = (score: number, logs: any) => {
+    const onGameComplete = async (score: number, logs: any) => {
         setMatchData({ score, logs })
         setGameState("payout")
-        // Logic for wallet update would go here in a real app
+
+        // Winner Payout
+        if (user) {
+            try {
+                await updateDoc(doc(db, "users", user.uid), {
+                    balance: increment(1600)
+                })
+            } catch (e) {
+                console.error("Payout failed", e)
+            }
+        }
     }
 
     const renderGame = () => {
@@ -192,14 +249,24 @@ export default function GameInstancePage() {
 
                                         <div className="space-y-4">
                                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-center text-white/20">Or Connect to Opponent</p>
-                                            <button
-                                                disabled={timeLeft === 0}
-                                                onClick={startConnection}
-                                                className="w-full py-6 bg-white text-black disabled:opacity-20 disabled:cursor-not-allowed rounded-[32px] font-black uppercase tracking-[0.3em] text-xs hover:scale-105 transition-all flex items-center justify-center gap-4"
-                                            >
-                                                {timeLeft > 0 ? "Enter Received Code" : "Refinitialize Room"}
-                                                <ChevronRight className="w-5 h-5" />
-                                            </button>
+                                            <div className="flex flex-col gap-3">
+                                                <button
+                                                    disabled={timeLeft === 0}
+                                                    onClick={handleSimulatorJoin}
+                                                    className="w-full py-6 bg-cyber-pink text-white disabled:opacity-20 disabled:cursor-not-allowed rounded-[32px] font-black uppercase tracking-[0.3em] text-xs hover:scale-105 transition-all flex items-center justify-center gap-4 shadow-[0_10px_30px_rgba(255,45,108,0.3)]"
+                                                >
+                                                    {timeLeft > 0 ? "Initializing Room (Wait)" : "Reinitialize Room"}
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </button>
+                                                <button
+                                                    disabled={timeLeft === 0}
+                                                    onClick={startConnection}
+                                                    className="w-full py-6 bg-white text-black disabled:opacity-20 disabled:cursor-not-allowed rounded-[32px] font-black uppercase tracking-[0.3em] text-xs hover:scale-105 transition-all flex items-center justify-center gap-4"
+                                                >
+                                                    Enter Received Code
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -404,6 +471,75 @@ export default function GameInstancePage() {
                         </motion.div>
                     )}
 
+                </AnimatePresence>
+
+                {/* INSUFFICIENT FUNDS MODAL */}
+                <AnimatePresence>
+                    {showTopUpModal && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                                onClick={() => setShowTopUpModal(false)}
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="relative bg-[#111] border border-white/10 rounded-[40px] p-10 max-w-md w-full shadow-2xl overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-8 opacity-5">
+                                    <Wallet className="w-48 h-48 text-white" />
+                                </div>
+                                <button
+                                    onClick={() => setShowTopUpModal(false)}
+                                    className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 transition-colors"
+                                >
+                                    <X className="w-5 h-5 text-white/40" />
+                                </button>
+
+                                <div className="relative z-10 text-center space-y-6">
+                                    <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <AlertCircle className="w-10 h-10 text-red-500" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h2 className="text-3xl font-black uppercase tracking-tighter italic">Low Balance</h2>
+                                        <p className="text-white/40 text-sm font-medium leading-relaxed">Your current balance (<span className="text-white">{balance.toLocaleString()} FRW</span>) is insufficient to cover the <span className="text-white">1000 FRW</span> entry fee.</p>
+                                    </div>
+
+                                    <div className="p-6 bg-black/40 rounded-3xl border border-white/5 space-y-3">
+                                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-white/20">
+                                            <span>Required Entry</span>
+                                            <span className="text-white">1000 FRW</span>
+                                        </div>
+                                        <div className="h-px bg-white/5" />
+                                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-white/20">
+                                            <span>Current Card</span>
+                                            <span className="text-red-500">{balance.toLocaleString()} FRW</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-3">
+                                        <button
+                                            onClick={() => router.push('/wallet')}
+                                            className="w-full py-5 bg-white text-black rounded-[24px] font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-xl"
+                                        >
+                                            <CreditCard className="w-4 h-4" />
+                                            Top Up Creda Card
+                                        </button>
+                                        <button
+                                            onClick={() => setShowTopUpModal(false)}
+                                            className="w-full py-4 text-white/20 font-black uppercase tracking-[0.2em] text-[8px] hover:text-white transition-colors"
+                                        >
+                                            Dismiss Notice
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
                 </AnimatePresence>
             </main>
         </div>
