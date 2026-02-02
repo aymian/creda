@@ -30,7 +30,7 @@ const NAV_ITEMS = [
     { icon: ThumbsUp, label: "For You", id: "foryou" },
     { icon: Users, label: "Following", id: "following" },
     { icon: Compass, label: "Explore", id: "explore" },
-    { icon: MessageCircle, label: "Chats", id: "chats", badge: 5 },
+    { icon: MessageCircle, label: "Chats", id: "chats", badge: 5, href: "/messages" },
 ]
 
 export function Header() {
@@ -68,44 +68,65 @@ export function Header() {
 
                     {/* Center Section: Navigation */}
                     <nav className="hidden lg:flex items-center gap-2">
-                        {NAV_ITEMS.map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => setActiveTab(item.id)}
-                                className="relative px-6 py-2 flex flex-col items-center justify-center group"
-                            >
-                                <div className="relative">
-                                    <motion.div
-                                        whileHover={{ scale: 1.2 }}
-                                        className={cn(
-                                            "p-1 transition-colors relative z-10",
-                                            activeTab === item.id ? "text-white" : "text-white/40 group-hover:text-white"
+                        {NAV_ITEMS.map((item) => {
+                            const content = (
+                                <>
+                                    <div className="relative">
+                                        <motion.div
+                                            whileHover={{ scale: 1.2 }}
+                                            className={cn(
+                                                "p-1 transition-colors relative z-10",
+                                                activeTab === item.id ? "text-white" : "text-white/40 group-hover:text-white"
+                                            )}
+                                        >
+                                            <item.icon className="w-6 h-6" />
+                                        </motion.div>
+                                        {item.badge && (
+                                            <span className="absolute -top-1 -right-2 bg-cyber-pink text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0C0C0C]">
+                                                {item.badge}
+                                            </span>
                                         )}
-                                    >
-                                        <item.icon className="w-6 h-6" />
-                                    </motion.div>
-                                    {item.badge && (
-                                        <span className="absolute -top-1 -right-2 bg-cyber-pink text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0C0C0C]">
-                                            {item.badge}
-                                        </span>
+                                    </div>
+
+                                    <span className={cn(
+                                        "text-[10px] font-bold mt-1 transition-colors uppercase tracking-wider",
+                                        activeTab === item.id ? "text-white" : "text-white/40 group-hover:text-white"
+                                    )}>
+                                        {item.label}
+                                    </span>
+
+                                    {activeTab === item.id && (
+                                        <motion.div
+                                            layoutId="header-underline"
+                                            className="absolute bottom-[-14px] left-6 right-6 h-0.5 bg-cyber-pink rounded-full shadow-[0_0_12px_rgba(255,45,108,0.8)]"
+                                        />
                                     )}
-                                </div>
+                                </>
+                            )
 
-                                <span className={cn(
-                                    "text-[10px] font-bold mt-1 transition-colors uppercase tracking-wider",
-                                    activeTab === item.id ? "text-white" : "text-white/40 group-hover:text-white"
-                                )}>
-                                    {item.label}
-                                </span>
+                            if (item.href) {
+                                return (
+                                    <Link
+                                        key={item.id}
+                                        href={item.href}
+                                        onClick={() => setActiveTab(item.id)}
+                                        className="relative px-6 py-2 flex flex-col items-center justify-center group"
+                                    >
+                                        {content}
+                                    </Link>
+                                )
+                            }
 
-                                {activeTab === item.id && (
-                                    <motion.div
-                                        layoutId="header-underline"
-                                        className="absolute bottom-[-14px] left-6 right-6 h-0.5 bg-cyber-pink rounded-full shadow-[0_0_12px_rgba(255,45,108,0.8)]"
-                                    />
-                                )}
-                            </button>
-                        ))}
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveTab(item.id)}
+                                    className="relative px-6 py-2 flex flex-col items-center justify-center group"
+                                >
+                                    {content}
+                                </button>
+                            )
+                        })}
                     </nav>
 
                     {/* Right Section: Actions */}
@@ -191,21 +212,47 @@ export function Header() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                {NAV_ITEMS.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                        className={cn(
-                                            "flex flex-col items-center gap-2 p-5 rounded-2xl transition-all",
-                                            activeTab === item.id
-                                                ? "bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/30 shadow-[0_0_20px_rgba(255,45,108,0.1)]"
-                                                : "bg-white/5 text-white/40 border border-white/5"
-                                        )}
-                                    >
-                                        <item.icon className="w-7 h-7" />
-                                        <span className="font-black text-xs uppercase">{item.label}</span>
-                                    </button>
-                                ))}
+                                {NAV_ITEMS.map((item) => {
+                                    const content = (
+                                        <>
+                                            <item.icon className="w-7 h-7" />
+                                            <span className="font-black text-xs uppercase">{item.label}</span>
+                                        </>
+                                    )
+
+                                    if (item.href) {
+                                        return (
+                                            <Link
+                                                key={item.id}
+                                                href={item.href}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                                className={cn(
+                                                    "flex flex-col items-center gap-2 p-5 rounded-2xl transition-all",
+                                                    activeTab === item.id
+                                                        ? "bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/30 shadow-[0_0_20px_rgba(255,45,108,0.1)]"
+                                                        : "bg-white/5 text-white/40 border border-white/5"
+                                                )}
+                                            >
+                                                {content}
+                                            </Link>
+                                        )
+                                    }
+
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                            className={cn(
+                                                "flex flex-col items-center gap-2 p-5 rounded-2xl transition-all",
+                                                activeTab === item.id
+                                                    ? "bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/30 shadow-[0_0_20px_rgba(255,45,108,0.1)]"
+                                                    : "bg-white/5 text-white/40 border border-white/5"
+                                            )}
+                                        >
+                                            {content}
+                                        </button>
+                                    )
+                                })}
                             </div>
 
                             {user ? (

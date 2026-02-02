@@ -14,10 +14,14 @@ import {
     Share2,
     Users,
     Check,
-    Briefcase
+    Briefcase,
+    Loader2,
+    Lock
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { UserListModal } from "@/components/UserListModal"
+import { doc, setDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove, updateDoc, getDoc, addDoc } from "firebase/firestore"
+import { cn } from "@/lib/utils"
 
 interface UserProfile {
     uid: string
@@ -33,6 +37,7 @@ interface UserProfile {
     followersCount?: number
     followingCount?: number
     createdAt?: any
+    isPrivate?: boolean
 }
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -46,8 +51,96 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         isOpen: false,
         type: "followers"
     })
+    const [isFollowing, setIsFollowing] = useState(false)
+    const [isFollowLoading, setIsFollowLoading] = useState(false)
+    const [hasPendingRequest, setHasPendingRequest] = useState(false)
 
     const username = resolvedParams?.username as string
+
+    const handleFollow = async () => {
+        if (!currentUser || !profile) return
+        setIsFollowLoading(true)
+
+        try {
+            if (isFollowing) {
+                // Unfollow
+                await deleteDoc(doc(db, "users", currentUser.uid, "following", profile.uid))
+                await deleteDoc(doc(db, "users", profile.uid, "followers", currentUser.uid))
+                setIsFollowing(false)
+            } else {
+                if (profile.isPrivate) {
+                    // Send Follow Request
+                    if (hasPendingRequest) return
+                    await addDoc(collection(db, "notifications"), {
+                        type: "follow_request",
+                        fromUserId: currentUser.uid,
+                        fromUsername: currentUser.displayName || "User",
+                        toUserId: profile.uid,
+                        status: "pending",
+                        timestamp: serverTimestamp()
+                    })
+                    setHasPendingRequest(true)
+                } else {
+                    // Direct Follow
+                    await setDoc(doc(db, "users", currentUser.uid, "following", profile.uid), {
+                        userId: profile.uid,
+                        timestamp: serverTimestamp()
+                    })
+                    await setDoc(doc(db, "users", profile.uid, "followers", currentUser.uid), {
+                        userId: currentUser.uid,
+                        timestamp: serverTimestamp()
+                    })
+                    setIsFollowing(true)
+                }
+            }
+        } catch (e) {
+            console.error("Follow error:", e)
+        } finally {
+            setIsFollowLoading(false)
+        }
+    }
+
+    const handleMessage = async () => {
+        if (!currentUser || !profile) return
+
+        try {
+            // query conversations where current user is a participant
+            const q = query(
+                collection(db, "conversations"),
+                where("participants", "array-contains", currentUser.uid)
+            )
+            const snapshot = await getDocs(q)
+
+            // Find if there's an existing conversation with the profile user
+            let conversationId = ""
+            const existingConv = snapshot.docs.find(doc => {
+                const participants = doc.data().participants as string[]
+                return participants.includes(profile.uid)
+            })
+
+            if (existingConv) {
+                conversationId = existingConv.id
+            } else {
+                // Create new conversation
+                // Note: We use addDoc so Firestore generates a random ID, 
+                // or we can stick to a random ID. Random is safer for security rules.
+                const newConvRef = await addDoc(collection(db, "conversations"), {
+                    participants: [currentUser.uid, profile.uid],
+                    lastMessageTime: serverTimestamp(),
+                    createdAt: serverTimestamp(),
+                    unreadCounts: {
+                        [currentUser.uid]: 0,
+                        [profile.uid]: 0
+                    }
+                })
+                conversationId = newConvRef.id
+            }
+
+            router.push(`/messages?id=${conversationId}`)
+        } catch (error) {
+            console.error("Error starting conversation:", error)
+        }
+    }
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -61,12 +154,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 const snapshot = await getDocs(q)
 
                 if (!snapshot.empty) {
-                    const doc = snapshot.docs[0]
-                    const userData = doc.data()
+                    const userDoc = snapshot.docs[0]
+                    const userData = userDoc.data()
 
                     // Fetch real counts from subcollections
-                    const followersRef = collection(db, "users", doc.id, "followers")
-                    const followingRef = collection(db, "users", doc.id, "following")
+                    const followersRef = collection(db, "users", userDoc.id, "followers")
+                    const followingRef = collection(db, "users", userDoc.id, "following")
 
                     const [followersSnap, followingSnap] = await Promise.all([
                         getCountFromServer(followersRef),
@@ -74,11 +167,31 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     ])
 
                     setProfile({
-                        uid: doc.id,
+                        uid: userDoc.id,
                         ...userData,
                         followersCount: followersSnap.data().count,
                         followingCount: followingSnap.data().count
                     } as UserProfile)
+
+                    // Check if current user follows this profile
+                    if (currentUser) {
+                        const followRef = doc(db, "users", currentUser.uid, "following", userDoc.id)
+                        const followSnap = await getDoc(followRef)
+                        setIsFollowing(followSnap.exists())
+
+                        // Check for pending request if profile is private
+                        if (userData.isPrivate) {
+                            const requestRef = query(
+                                collection(db, "notifications"),
+                                where("fromUserId", "==", currentUser.uid),
+                                where("toUserId", "==", userDoc.id),
+                                where("type", "==", "follow_request"),
+                                where("status", "==", "pending")
+                            )
+                            const requestSnap = await getDocs(requestRef)
+                            setHasPendingRequest(!requestSnap.empty)
+                        }
+                    }
                 } else {
                     setProfile(null)
                 }
@@ -159,6 +272,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                 <h1 className="text-3xl font-black text-white flex items-center gap-2">
                                     {profile.displayName}
                                     <Check className="w-5 h-5 text-cyber-cyan bg-cyber-cyan/10 rounded-full p-0.5" strokeWidth={4} />
+                                    {profile.isPrivate && <Lock className="w-4 h-4 text-white/20" />}
                                 </h1>
                                 <p className="text-white/40 font-bold">@{profile.username}</p>
                             </div>
@@ -170,12 +284,34 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                                     </button>
                                 ) : (
                                     <>
-                                        <button className="px-8 py-2 bg-cyber-pink text-white rounded-full font-black uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,45,108,0.3)]">
-                                            Follow
+                                        <button
+                                            onClick={handleFollow}
+                                            disabled={isFollowLoading}
+                                            className={cn(
+                                                "px-8 py-2 rounded-full font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(255,45,108,0.3)] flex items-center gap-2",
+                                                isFollowing
+                                                    ? "bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                                                    : "bg-cyber-pink text-white hover:scale-105"
+                                            )}
+                                        >
+                                            {isFollowLoading ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : isFollowing ? (
+                                                "Unfollow"
+                                            ) : hasPendingRequest ? (
+                                                "Requested"
+                                            ) : (
+                                                "Follow"
+                                            )}
                                         </button>
-                                        <button className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all">
-                                            <MessageCircle className="w-5 h-5" />
-                                        </button>
+                                        {(isFollowing || !profile.isPrivate) && (
+                                            <button
+                                                onClick={handleMessage}
+                                                className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all"
+                                            >
+                                                <MessageCircle className="w-5 h-5" />
+                                            </button>
+                                        )}
                                     </>
                                 )}
                                 <button className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all">
@@ -257,24 +393,36 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
                 {/* Content Area */}
                 <div className="min-h-[300px]">
-                    {activeTab === 'posts' && (
-                        <div className="text-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
-                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-white/20">
-                                <Briefcase className="w-8 h-8" />
+                    {profile.isPrivate && !isFollowing && currentUser?.uid !== profile.uid ? (
+                        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+                            <div className="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center border border-white/10 mb-6 group hover:border-cyber-pink/50 transition-colors">
+                                <Lock className="w-10 h-10 text-white/20 group-hover:text-cyber-pink transition-colors" />
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">No posts yet</h3>
-                            <p className="text-white/40 max-w-sm mx-auto">
-                                This user hasn't published any content to their feed yet.
-                            </p>
+                            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">This account is private</h3>
+                            <p className="text-white/40 max-w-sm font-medium">Follow this user to see their posts and visual identity moments.</p>
                         </div>
-                    )}
-                    {activeTab === 'media' && (
-                        <div className="grid grid-cols-3 gap-1 md:gap-4">
-                            {/* Placeholder for media grid */}
-                            {[1, 2, 3, 4, 5, 6].map(i => (
-                                <div key={i} className="aspect-square bg-white/5 rounded-xl animate-pulse" />
-                            ))}
-                        </div>
+                    ) : (
+                        <>
+                            {activeTab === 'posts' && (
+                                <div className="text-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-white/20">
+                                        <Briefcase className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">No posts yet</h3>
+                                    <p className="text-white/40 max-w-sm mx-auto">
+                                        This user hasn't published any content to their feed yet.
+                                    </p>
+                                </div>
+                            )}
+                            {activeTab === 'media' && (
+                                <div className="grid grid-cols-3 gap-1 md:gap-4">
+                                    {/* Placeholder for media grid */}
+                                    {[1, 2, 3, 4, 5, 6].map(i => (
+                                        <div key={i} className="aspect-square bg-white/5 rounded-xl animate-pulse" />
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

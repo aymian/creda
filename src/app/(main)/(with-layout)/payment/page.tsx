@@ -9,7 +9,10 @@ import {
     Zap,
     Check,
     Loader2,
-    Lock
+    Lock,
+    Smartphone,
+    Copy,
+    CheckCircle2
 } from "lucide-react"
 import {
     PayPalScriptProvider,
@@ -17,16 +20,22 @@ import {
     usePayPalScriptReducer
 } from "@paypal/react-paypal-js"
 
-const PAYPAL_CLIENT_ID = "AakMknFYXkirSboJsgf3Pv15vn0CiP5xdkRwVqypaygJ3Q2MreapnHiHYWC70Z5c42-WiOgUuUGgnTcd"
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "AakMknFYXkirSboJsgf3Pv15vn0CiP5xdkRwVqypaygJ3Q2MreapnHiHYWC70Z5c42-WiOgUuUGgnTcd"
 
 function PaymentContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
     const [isSuccess, setIsSuccess] = useState(false)
-    const [{ isPending }] = usePayPalScriptReducer()
+    const [paymentMethod, setPaymentMethod] = useState<'paypal' | 'momo'>(() => {
+        // Default to momo if there's a suspected PayPal issue, or stick to paypal
+        return 'paypal'
+    })
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
 
     const planId = searchParams.get('id') || 'pro'
-    const amount = "0.5" // Forced 0.5 for testing
+    const amount = searchParams.get('amount') || "40"
+    const rwfAmount = Number(amount) * 1600
     const cycle = searchParams.get('cycle') || 'monthly'
 
     const planName = planId.charAt(0).toUpperCase() + planId.slice(1)
@@ -99,7 +108,9 @@ function PaymentContent() {
                     <div className="space-y-4 relative z-10">
                         <div className="flex justify-between text-base">
                             <span className="text-white/40 font-bold italic">Verification Fee</span>
-                            <span className="font-black text-white">${amount}.00</span>
+                            <span className="font-black text-white">
+                                {paymentMethod === 'paypal' ? `$${amount}.00` : `${rwfAmount.toLocaleString()} FRW`}
+                            </span>
                         </div>
                         <div className="flex justify-between text-base">
                             <span className="text-white/40 font-bold italic">Network Access</span>
@@ -111,8 +122,15 @@ function PaymentContent() {
 
                     <div className="flex justify-between items-center relative z-10">
                         <span className="text-xl font-black uppercase tracking-[0.3em] text-white/60">Total</span>
-                        <div className="text-right">
-                            <span className="text-4xl font-black text-cyber-pink drop-shadow-[0_0_15px_rgba(255,45,108,0.3)]">${amount}.00</span>
+                        <div className="text-right flex flex-col items-end">
+                            <span className="text-4xl font-black text-cyber-pink drop-shadow-[0_0_15px_rgba(255,45,108,0.3)]">
+                                {paymentMethod === 'paypal' ? `$${amount}.00` : `${rwfAmount.toLocaleString()} FRW`}
+                            </span>
+                            {paymentMethod === 'momo' && (
+                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest mt-1">
+                                    fixed rate: 1 USD = 1600 FRW
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -120,8 +138,14 @@ function PaymentContent() {
                 <div className="flex items-center gap-6 p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
                     <ShieldCheck className="w-12 h-12 text-cyber-pink p-2 bg-cyber-pink/10 rounded-2xl shadow-inner" />
                     <div>
-                        <p className="font-black text-xs uppercase tracking-[0.2em] text-white">Encrypted Transaction</p>
-                        <p className="text-[11px] text-white/40 font-bold italic">Processed securely via PayPal global network.</p>
+                        <p className="font-black text-xs uppercase tracking-[0.2em] text-white">
+                            {paymentMethod === 'paypal' ? 'Encrypted Transaction' : 'Manual Verification'}
+                        </p>
+                        <p className="text-[11px] text-white/40 font-bold italic">
+                            {paymentMethod === 'paypal'
+                                ? 'Processed securely via PayPal global network.'
+                                : 'Pay using USSD codes and wait for manual approval.'}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -136,45 +160,100 @@ function PaymentContent() {
                     <div className="h-1 w-12 bg-black rounded-full" />
                 </div>
 
-                <div className="min-h-[300px] flex flex-col justify-center gap-6">
-                    {isPending && (
-                        <div className="flex flex-col items-center justify-center py-12 gap-4">
-                            <Loader2 className="w-8 h-8 animate-spin text-black/20" />
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-20">Loading Secure Portal...</p>
+                <div className="flex bg-black/5 p-1 rounded-2xl">
+                    <button
+                        onClick={() => setPaymentMethod('paypal')}
+                        className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${paymentMethod === 'paypal' ? 'bg-white shadow-sm text-black' : 'text-black/40 hover:text-black'}`}
+                    >
+                        PayPal / Card
+                    </button>
+                    <button
+                        onClick={() => setPaymentMethod('momo')}
+                        className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${paymentMethod === 'momo' ? 'bg-white shadow-sm text-black' : 'text-black/40 hover:text-black'}`}
+                    >
+                        Mobile Money
+                    </button>
+                </div>
+
+                <div className="min-h-[350px] flex flex-col justify-start gap-6">
+                    {paymentMethod === 'paypal' ? (
+                        <PayPalScriptProvider options={{
+                            "clientId": PAYPAL_CLIENT_ID,
+                            currency: "USD",
+                            intent: "capture",
+                            "disable-card-billing-address": "true"
+                        }}>
+                            <PayPalButtonsWrapper
+                                planName={planName}
+                                cycle={cycle}
+                                amount={amount}
+                                handleSuccess={handleSuccess}
+                            />
+                        </PayPalScriptProvider>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="p-6 rounded-3xl bg-black/5 border border-black/5 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-black rounded-xl">
+                                        <Smartphone className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40 leading-none mb-1">Account Holder</p>
+                                        <p className="font-black text-sm uppercase">Ishimwe Yves</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                {[
+                                    {
+                                        label: "Airtel Money",
+                                        code: `*182*1*1*0732539470*${rwfAmount}*mobile money pin#`,
+                                        subtitle: "Dial this code to pay"
+                                    },
+                                    {
+                                        label: "MTN Money",
+                                        code: `*182*1*1*0792898287*${rwfAmount}*mobile money pin#`,
+                                        subtitle: "Dial this code to pay"
+                                    },
+                                    {
+                                        label: "MTN MoMo Code",
+                                        code: `*182*8*1*1915918*${rwfAmount}*mobile money pin#`,
+                                        subtitle: "Use Merchant Code"
+                                    }
+                                ].map((item, idx) => (
+                                    <div key={idx} className="group relative">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(item.code)
+                                                setCopiedIndex(idx)
+                                                setTimeout(() => setCopiedIndex(null), 2000)
+                                            }}
+                                            className="w-full text-left p-5 rounded-[2rem] bg-black/5 border border-transparent hover:border-black/10 hover:bg-black/[0.07] transition-all group"
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-black/40">{item.label}</span>
+                                                {copiedIndex === idx ? (
+                                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                                ) : (
+                                                    <Copy className="w-4 h-4 text-black/20 group-hover:text-black/40 transition-colors" />
+                                                )}
+                                            </div>
+                                            <p className="font-black text-xs break-all leading-relaxed pr-8">
+                                                {item.code}
+                                            </p>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="p-6 rounded-3xl bg-cyber-pink/5 border border-cyber-pink/10">
+                                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-cyber-pink text-center">
+                                    After payment, your status will be updated manually within 5 minutes.
+                                </p>
+                            </div>
                         </div>
                     )}
-
-                    <PayPalButtons
-                        style={{
-                            layout: "vertical",
-                            color: "black",
-                            shape: "pill",
-                            label: "pay",
-                            height: 55
-                        }}
-                        createOrder={(data, actions) => {
-                            return actions.order.create({
-                                purchase_units: [{
-                                    description: `${planName} Subscription (${cycle})`,
-                                    amount: {
-                                        currency_code: "USD",
-                                        value: amount
-                                    }
-                                }],
-                                intent: "CAPTURE"
-                            });
-                        }}
-                        onApprove={async (data, actions) => {
-                            if (actions.order) {
-                                const details = await actions.order.capture();
-                                handleSuccess(details);
-                                return Promise.resolve();
-                            }
-                        }}
-                        onError={(err) => {
-                            console.error("PayPal Error:", err);
-                        }}
-                    />
                 </div>
 
                 <div className="space-y-6 pt-4 border-t border-black/5">
@@ -191,23 +270,89 @@ function PaymentContent() {
     )
 }
 
+function PayPalButtonsWrapper({ planName, cycle, amount, handleSuccess }: any) {
+    const [{ isPending, isRejected }] = usePayPalScriptReducer()
+
+    if (isRejected) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+                <div className="p-4 bg-red-50 rounded-2xl">
+                    <ShieldCheck className="w-8 h-8 text-red-500 opacity-50" />
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-black uppercase tracking-widest text-red-600">Gateway Error</p>
+                    <p className="text-[10px] font-bold text-black/40 px-6">
+                        Failed to load PayPal. This may be due to regional restrictions or an invalid Client ID.
+                        Please try Mobile Money instead.
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <>
+            {isPending && (
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <Loader2 className="w-8 h-8 animate-spin text-black/20" />
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-20">Initializing Secure Gateway...</p>
+                </div>
+            )}
+            <PayPalButtons
+                style={{
+                    layout: "vertical",
+                    color: "black",
+                    shape: "pill",
+                    label: "pay",
+                    height: 55
+                }}
+                createOrder={(data, actions) => {
+                    return actions.order.create({
+                        intent: "CAPTURE",
+                        purchase_units: [{
+                            description: `${planName} Subscription (${cycle})`,
+                            amount: {
+                                currency_code: "USD",
+                                value: amount
+                            },
+                            items: [{
+                                name: `${planName} Verified Status`,
+                                unit_amount: {
+                                    currency_code: "USD",
+                                    value: amount
+                                },
+                                quantity: "1",
+                                category: "DIGITAL_GOODS"
+                            }]
+                        }]
+                    });
+                }}
+                onApprove={async (data, actions) => {
+                    if (actions.order) {
+                        const details = await actions.order.capture();
+                        handleSuccess(details);
+                        return Promise.resolve();
+                    }
+                }}
+                onError={(err) => {
+                    console.error("PayPal Error:", err);
+                }}
+            />
+        </>
+    )
+}
+
 export default function PaymentPage() {
     return (
         <div className="min-h-screen bg-black py-24 px-8">
-            <PayPalScriptProvider options={{
-                "clientId": PAYPAL_CLIENT_ID,
-                currency: "USD",
-                intent: "capture"
-            }}>
-                <Suspense fallback={
-                    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
-                        <Loader2 className="w-12 h-12 text-cyber-pink animate-spin opacity-20" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Initializing Gateways...</p>
-                    </div>
-                }>
-                    <PaymentContent />
-                </Suspense>
-            </PayPalScriptProvider>
+            <Suspense fallback={
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                    <Loader2 className="w-12 h-12 text-cyber-pink animate-spin opacity-20" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Initializing Gateways...</p>
+                </div>
+            }>
+                <PaymentContent />
+            </Suspense>
         </div>
     )
 }
