@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Video, Radio, Copy, Check } from "lucide-react"
 import dynamic from "next/dynamic"
-const ReactPlayer = dynamic(() => import("react-player"), { ssr: false })
+const ReactPlayer = dynamic(() => import("react-player"), { ssr: false }) as any
 import { db } from "@/lib/firebase"
 import { doc, updateDoc } from "firebase/firestore"
 import { useAuth } from "@/context/AuthContext"
@@ -155,16 +155,16 @@ export default function LiveStreamModal({ isOpen, onClose, mode, watchUrl, broad
                             // Watch Mode
                             <div className="w-full h-full bg-black">
                                 <ReactPlayer
-                                    url={watchUrl}
-                                    playing
-                                    controls
+                                    url={watchUrl ?? ""}
+                                    playing={true}
+                                    controls={true}
                                     width="100%"
                                     height="100%"
                                     config={{
                                         file: {
                                             forceHLS: true
                                         }
-                                    } as any}
+                                    }}
                                 />
                             </div>
                         )}
