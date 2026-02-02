@@ -98,8 +98,8 @@ const AVAILABLE_GAMES = [
         borderColor: "border-green-400/20",
         difficulty: "Strategic",
         duration: "1-2min",
-        priority: false,
-        features: ["Deterministic", "Puzzle Set Hash", "Audit Logged"]
+        priority: true,
+        features: ["8-Puzzle Solver", "Puzzle Set Hash", "Audit Logged"]
     }
 ]
 
