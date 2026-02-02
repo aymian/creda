@@ -50,7 +50,7 @@ export default function GameInstancePage() {
     const [connectionProgress, setConnectionProgress] = useState(0)
     const [preStartTimer, setPreStartTimer] = useState(5)
 
-    // Wallet & Match States
+    const [lobbyTab, setLobbyTab] = useState<"host" | "join">("host")
     const [balance, setBalance] = useState(0)
     const [showTopUpModal, setShowTopUpModal] = useState(false)
     const [matchDocId, setMatchDocId] = useState<string | null>(null)
@@ -314,7 +314,7 @@ export default function GameInstancePage() {
                                     </p>
 
                                     {/* STAKE LOGIC */}
-                                    {!isReceiver ? (
+                                    {lobbyTab === "host" ? (
                                         <div className="bg-[#0C0C0C] border border-white/5 rounded-[40px] p-8 space-y-6">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Adjust wager</span>
@@ -348,21 +348,38 @@ export default function GameInstancePage() {
                                         <div className="bg-cyber-pink/5 border border-cyber-pink/20 rounded-[40px] p-10 space-y-4">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-cyber-pink animate-pulse" />
-                                                <span className="text-[10px] font-black uppercase text-cyber-pink tracking-widest">Enforced match stake</span>
+                                                <span className="text-[10px] font-black uppercase text-cyber-pink tracking-widest">Join Protocol Active</span>
                                             </div>
-                                            <h3 className="text-5xl font-black italic">{stakeCurrency} {stakeAmount.toLocaleString()}</h3>
+                                            <h3 className="text-2xl font-black italic uppercase">Awaiting Identity <br />Verification</h3>
                                             <div className="h-px bg-cyber-pink/10 w-full" />
-                                            <div className="flex justify-between text-[10px] font-bold text-white/40 uppercase">
-                                                <span>Potential Payout</span>
-                                                <span className="text-green-500">{(stakeAmount * 2 * 0.8).toLocaleString()} {stakeCurrency}</span>
-                                            </div>
+                                            <p className="text-[10px] font-bold text-white/40 uppercase leading-relaxed">
+                                                The match stake will be automatically synced from the host. Ensure your balance is sufficient to match the wager.
+                                            </p>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Right Side: Connection Panel */}
                                 <div className="bg-[#0C0C0C] border border-white/10 rounded-[50px] p-12 space-y-10 shadow-[0_0_100px_rgba(255,45,108,0.05)]">
-                                    {!isReceiver ? (
+                                    {/* Role Toggle */}
+                                    {!isReceiver && (
+                                        <div className="flex gap-2 p-1.5 bg-white/5 border border-white/5 rounded-2xl">
+                                            <button
+                                                onClick={() => setLobbyTab("host")}
+                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${lobbyTab === "host" ? 'bg-cyber-pink text-white shadow-lg' : 'text-white/40 hover:text-white'}`}
+                                            >
+                                                Host Match
+                                            </button>
+                                            <button
+                                                onClick={() => setLobbyTab("join")}
+                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${lobbyTab === "join" ? 'bg-cyber-pink text-white shadow-lg' : 'text-white/40 hover:text-white'}`}
+                                            >
+                                                Join Match
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {lobbyTab === "host" ? (
                                         <div className="text-center space-y-10">
                                             <div className="space-y-4">
                                                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Identity Access Code</p>
