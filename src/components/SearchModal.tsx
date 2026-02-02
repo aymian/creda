@@ -50,19 +50,16 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                     const data = doc.data()
 
                     let followerCount = 0
-                    try {
-                        // Check subcollection count first (Source of Truth)
-                        const followersRef = collection(db, "users", doc.id, "followers")
-                        const snapshot = await getCountFromServer(followersRef)
-                        followerCount = snapshot.data().count
-                    } catch (e) {
-                        // Fallback to legacy fields
-                        if (Array.isArray(data.followers)) {
-                            followerCount = data.followers.length
-                        } else if (typeof data.followers === 'number') {
-                            followerCount = data.followers
-                        }
+
+                    // Optimization: Use data directly from document to avoid N+1 network requests
+                    if (typeof data.followersCount === 'number') {
+                        followerCount = data.followersCount
+                    } else if (Array.isArray(data.followers)) {
+                        followerCount = data.followers.length
+                    } else if (typeof data.followers === 'number') {
+                        followerCount = data.followers
                     }
+                    // Skipped getCountFromServer for performance on slow networks
 
                     return {
                         id: doc.id,
@@ -237,7 +234,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-cyber-pink to-purple-600 flex items-center justify-center text-xs font-black text-white">
                                                     {user.photoURL ? (
-                                                        <img src={user.photoURL} alt={user.name} className="w-full h-full object-cover" />
+                                                        <img src={user.photoURL} alt={user.name} loading="lazy" className="w-full h-full object-cover" />
                                                     ) : (
                                                         user.name?.[0]?.toUpperCase() || 'U'
                                                     )}

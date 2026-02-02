@@ -15,7 +15,9 @@ import {
     Signal,
     SignalHigh,
     SignalLow,
-    Smartphone
+    Smartphone,
+    Minimize2,
+    Maximize2
 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import {
@@ -64,6 +66,7 @@ function CallItem() {
     const [isConnected, setIsConnected] = useState(false)
     const [connectionState, setConnectionState] = useState('Connecting...')
     const [quality, setQuality] = useState<'good' | 'poor' | 'bad'>('good')
+    const [isLocalVideoCollapsed, setIsLocalVideoCollapsed] = useState(false)
 
     const localVideoRef = useRef<HTMLVideoElement>(null)
     const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -91,11 +94,12 @@ function CallItem() {
                 console.log('Requesting media access...')
 
                 // Get local media stream
+                // Use modest resolution for compatibility and speed on "lite" connections
                 const constraints = {
                     audio: true,
                     video: callType === 'video' ? {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
                         facingMode: 'user'
                     } : false
                 }
@@ -460,15 +464,30 @@ function CallItem() {
                     <motion.div
                         drag
                         dragConstraints={{ left: -300, right: 300, top: -300, bottom: 300 }}
-                        className="absolute bottom-24 right-6 w-40 h-56 lg:w-48 lg:h-64 bg-[#1A1A1A] rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10 cursor-move"
+                        animate={{
+                            width: isLocalVideoCollapsed ? 80 : (window.innerWidth < 1024 ? 160 : 192),
+                            height: isLocalVideoCollapsed ? 80 : (window.innerWidth < 1024 ? 224 : 256),
+                            borderRadius: isLocalVideoCollapsed ? 40 : 24
+                        }}
+                        className="absolute bottom-24 right-6 bg-[#1A1A1A] overflow-hidden shadow-2xl border-2 border-white/10 cursor-move z-50 group"
                     >
                         <video
                             ref={localVideoRef}
                             autoPlay
                             playsInline
                             muted
-                            className="w-full h-full object-cover mirror"
+                            className={`w-full h-full object-cover mirror ${isLocalVideoCollapsed ? 'opacity-50' : ''}`}
                         />
+
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsLocalVideoCollapsed(!isLocalVideoCollapsed);
+                            }}
+                            className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white/80 hover:text-white transition-all opacity-0 group-hover:opacity-100 z-50 backdrop-blur-sm"
+                        >
+                            {isLocalVideoCollapsed ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
+                        </button>
                     </motion.div>
                 )}
             </div>

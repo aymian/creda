@@ -27,12 +27,19 @@ import {
     Phone,
     Mic,
     SendHorizontal,
-    Camera
+    Camera,
+    Play,
+    Pause,
+    Square,
+    StopCircle
 } from "lucide-react"
-import EmojiPicker, { Theme } from 'emoji-picker-react'
+import dynamic from 'next/dynamic'
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false })
 import IncomingCallModal from '@/components/IncomingCallModal'
+import LiveStreamModal from '@/components/LiveStreamModal'
 import { initiateCall, updateCallStatus, sendMissedCallMessage } from '@/lib/callNotifications'
-import { db, auth } from "@/lib/firebase"
+import { db, auth, storage } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import {
     collection,
     query,
@@ -64,13 +71,15 @@ const GiftIcon = () => (
     <Gift className="w-6 h-6 text-white/40 hover:text-white transition-all cursor-pointer" />
 )
 
-
 interface Message {
     id: string
     text: string
     senderId: string
     timestamp: any
     status: 'sent' | 'read'
+    type?: 'text' | 'audio'
+    audioUrl?: string
+    duration?: number
     isEdited?: boolean
     editedAt?: any
     replyTo?: {
@@ -118,6 +127,21 @@ export default function MessagesPage() {
     const [messageToManage, setMessageToManage] = useState<any | null>(null)
     const [incomingCall, setIncomingCall] = useState<any | null>(null)
     const [currentCallId, setCurrentCallId] = useState<string | null>(null)
+
+    // Audio Recording State
+    const [isRecording, setIsRecording] = useState(false)
+    const [recordingTime, setRecordingTime] = useState(0)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const audioChunksRef = useRef<Blob[]>([])
+    const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const [playingAudioId, setPlayingAudioId] = useState<string | null>(null)
+
+    // Live Stream State
+    const [showLiveModal, setShowLiveModal] = useState(false)
+    const [liveMode, setLiveMode] = useState<'broadcast' | 'watch'>('broadcast')
+    const [liveStreamUrl, setLiveStreamUrl] = useState('')
+    const [currentBroadcasterName, setCurrentBroadcasterName] = useState('')
+    const [liveUsers, setLiveUsers] = useState<Record<string, any>>({})
 
     // Handle Visual Viewport (Mobile Keyboard)
     useEffect(() => {
@@ -266,7 +290,20 @@ export default function MessagesPage() {
             })
         })
 
-        return () => unsubscribe()
+        // Listen for live users
+        const liveQuery = query(collection(db, "users"), where("isLive", "==", true))
+        const liveUnsubscribe = onSnapshot(liveQuery, (snapshot) => {
+            const live: Record<string, any> = {}
+            snapshot.docs.forEach(doc => {
+                live[doc.id] = doc.data()
+            })
+            setLiveUsers(live)
+        })
+
+        return () => {
+            unsubscribe()
+            liveUnsubscribe()
+        }
     }, [user])
 
     const handleAcceptCall = async () => {
@@ -302,14 +339,15 @@ export default function MessagesPage() {
 
         const q = query(
             collection(db, "conversations", selectedId, "messages"),
-            orderBy("timestamp", "asc")
+            orderBy("timestamp", "desc"),
+            limit(50)
         )
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const msgs = snapshot.docs.map(mDoc => ({
                 id: mDoc.id,
                 ...mDoc.data()
-            } as Message))
+            } as Message)).reverse()
             setMessages(msgs)
 
             // Mark messages as read efficiently
@@ -376,7 +414,7 @@ export default function MessagesPage() {
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault()
-        if (!message.trim() || !selectedId || !user) return
+        if ((!message.trim() && !isRecording) || !selectedId || !user) return
 
         const messageText = message
         const currentReplyingTo = replyingTo
@@ -412,6 +450,7 @@ export default function MessagesPage() {
                 senderId: user.uid,
                 timestamp: serverTimestamp(),
                 status: 'sent',
+                type: 'text',
                 replyTo: currentReplyingTo ? {
                     id: currentReplyingTo.id,
                     text: currentReplyingTo.text,
@@ -436,6 +475,172 @@ export default function MessagesPage() {
         } catch (error) {
             console.error("Error sending message:", error)
         }
+    }
+
+    // Audio Functions
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const mediaRecorder = new MediaRecorder(stream)
+            mediaRecorderRef.current = mediaRecorder
+            audioChunksRef.current = []
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunksRef.current.push(event.data)
+            }
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' })
+                await sendAudioMessage(audioBlob, recordingTime)
+
+                // Cleanup stream
+                stream.getTracks().forEach(track => track.stop())
+            }
+
+            mediaRecorder.start()
+            setIsRecording(true)
+            setRecordingTime(0)
+
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1)
+            }, 1000)
+
+        } catch (error) {
+            console.error("Error starting recording:", error)
+            alert("Could not access microphone")
+        }
+    }
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop()
+            setIsRecording(false)
+            if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+        }
+    }
+
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            // Override onstop to do nothing
+            mediaRecorderRef.current.onstop = null
+            mediaRecorderRef.current.stop()
+            setIsRecording(false)
+            if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+            // Cleanup stream tracks
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
+        }
+    }
+
+    const sendAudioMessage = async (audioBlob: Blob, duration: number) => {
+        if (!selectedId || !user) return
+
+        try {
+            // Upload to Storage
+            const storageRef = ref(storage, `audio/${selectedId}/${Date.now()}.mp3`)
+            await uploadBytes(storageRef, audioBlob)
+            const downloadUrl = await getDownloadURL(storageRef)
+
+            // Save to Firestore
+            await addDoc(collection(db, "conversations", selectedId, "messages"), {
+                type: 'audio',
+                audioUrl: downloadUrl,
+                duration: duration,
+                text: '🎤 Audio Message', // Fallback text
+                senderId: user.uid,
+                timestamp: serverTimestamp(),
+                status: 'sent'
+            })
+
+            // Update conversation
+            const convDoc = doc(db, "conversations", selectedId)
+            const chat = conversations.find(c => c.id === selectedId)
+            const otherParticipantId = chat?.participants.find((p: string) => p !== user.uid)
+
+            const updateData: any = {
+                lastMessage: '🎤 Audio Message',
+                lastMessageTime: serverTimestamp(),
+                lastMessageSenderId: user.uid,
+                [`typing.${user.uid}`]: false
+            }
+
+            if (otherParticipantId) {
+                updateData[`unreadCounts.${otherParticipantId}`] = increment(1)
+            }
+
+            await updateDoc(convDoc, updateData)
+
+        } catch (error) {
+            console.error("Error uploading audio:", error)
+        }
+    }
+
+    const formatDuration = (seconds: number) => {
+        const mins = Math.floor(seconds / 60)
+        const secs = seconds % 60
+        return `${mins}:${secs.toString().padStart(2, '0')}`
+    }
+
+    // Audio Player Component (Inline)
+    const AudioPlayer = ({ src, duration }: { src: string, duration: number }) => {
+        const audioRef = useRef<HTMLAudioElement>(null)
+        const [isPlaying, setIsPlaying] = useState(false)
+        const [progress, setProgress] = useState(0)
+
+        const togglePlay = () => {
+            if (audioRef.current) {
+                if (isPlaying) {
+                    audioRef.current.pause()
+                } else {
+                    // Pause others if needed (global state not implemented for simplicity, but acceptable)
+                    audioRef.current.play()
+                }
+                setIsPlaying(!isPlaying)
+            }
+        }
+
+        useEffect(() => {
+            const audio = audioRef.current
+            if (!audio) return
+
+            const updateProgress = () => {
+                if (audio.duration) {
+                    setProgress((audio.currentTime / audio.duration) * 100)
+                }
+            }
+
+            const handleEnded = () => {
+                setIsPlaying(false)
+                setProgress(0)
+            }
+
+            audio.addEventListener('timeupdate', updateProgress)
+            audio.addEventListener('ended', handleEnded)
+
+            return () => {
+                audio.removeEventListener('timeupdate', updateProgress)
+                audio.removeEventListener('ended', handleEnded)
+            }
+        }, [])
+
+        return (
+            <div className="flex items-center gap-3 w-[200px]">
+                <audio ref={audioRef} src={src} preload="metadata" />
+                <button
+                    onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                    className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-all shrink-0"
+                >
+                    {isPlaying ? <Pause className="w-4 h-4" fill="currentColor" /> : <Play className="w-4 h-4" fill="currentColor ml-0.5" />}
+                </button>
+                <div className="flex-1 flex flex-col gap-1">
+                    <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                        <div className="h-full bg-white transition-all duration-100" style={{ width: `${progress}%` }} />
+                    </div>
+                    <span className="text-[9px] font-bold opacity-60 tabular-nums">
+                        {formatDuration(duration || 0)}
+                    </span>
+                </div>
+            </div>
+        )
     }
 
     const handleDeleteMessage = async (msgId: string) => {
@@ -551,12 +756,35 @@ export default function MessagesPage() {
                                         className={`px-4 py-1 cursor-pointer transition-all`}
                                     >
                                         <div className={`flex items-center gap-3 p-3 rounded-2xl relative transition-all ${selectedId === chat.id ? 'bg-[#FF2D6C]' : 'hover:bg-white/5'}`}>
-                                            <div className="relative shrink-0">
-                                                <img
-                                                    src={info.avatar}
-                                                    className="w-12 h-12 rounded-full border border-white/10 object-cover"
-                                                    alt=""
-                                                />
+                                            <div
+                                                className="relative shrink-0 cursor-pointer"
+                                                onClick={(e) => {
+                                                    const otherId = chat.participants.find((p: string) => p !== user?.uid)
+                                                    if (otherId && liveUsers[otherId]) {
+                                                        e.stopPropagation() // Prevent selecting chat
+                                                        setLiveMode('watch')
+                                                        setLiveStreamUrl(liveUsers[otherId].liveStreamUrl || "https://res.cloudinary.com/dzvwfdpxw/video/live/live_stream_2605152ed997494f9a89330a3ebdc2c6_hls.m3u8")
+                                                        setCurrentBroadcasterName(info.name)
+                                                        setShowLiveModal(true)
+                                                    }
+                                                }}
+                                            >
+                                                {(() => {
+                                                    const otherId = chat.participants.find((p: string) => p !== user?.uid)
+                                                    const isUserLive = otherId && liveUsers[otherId]
+
+                                                    return (
+                                                        <div className={`rounded-full p-[2px] ${isUserLive ? 'bg-gradient-to-tr from-cyber-pink to-purple-600 animate-pulse' : 'border border-white/10'}`}>
+                                                            <img
+                                                                src={info.avatar || `https://ui-avatars.com/api/?name=${info.name}&background=random`}
+                                                                loading="lazy"
+                                                                decoding="async"
+                                                                className="w-11 h-11 rounded-full object-cover border-2 border-black"
+                                                                alt=""
+                                                            />
+                                                        </div>
+                                                    )
+                                                })()}
                                                 {(() => {
                                                     const otherId = chat.participants.find((p: string) => p !== user?.uid)
                                                     return otherId && chat.onlineStatus?.[otherId] ? (
@@ -648,11 +876,7 @@ export default function MessagesPage() {
                                             </div>
                                         )}
                                     </h2>
-                                    {otherUserTyping ? (
-                                        <span className="text-[10px] font-black uppercase text-cyber-pink tracking-widest animate-pulse">Typing...</span>
-                                    ) : (
-                                        <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Active Now</span>
-                                    )}
+                                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Active Now</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 lg:gap-4">
@@ -757,7 +981,11 @@ export default function MessagesPage() {
                                                         if (isMe) setMessageToManage(msg)
                                                     }}
                                                 >
-                                                    {msg.text}
+                                                    {msg.type === 'audio' && msg.audioUrl ? (
+                                                        <AudioPlayer src={msg.audioUrl} duration={msg.duration || 0} />
+                                                    ) : (
+                                                        msg.text
+                                                    )}
                                                     {msg.isEdited && (
                                                         <span className="text-[9px] opacity-40 italic block mt-1">Edited</span>
                                                     )}
@@ -820,6 +1048,20 @@ export default function MessagesPage() {
                                             </div>
                                         )
                                     })}
+                                    {otherUserTyping && (
+                                        <div className="flex items-center gap-3 px-1 mb-2">
+                                            <img
+                                                src={getChatHeaderInfo(conversations.find(c => c.id === selectedId)).avatar}
+                                                className="w-8 h-8 rounded-full border border-white/10 object-cover"
+                                                alt=""
+                                            />
+                                            <div className="bg-white/10 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-1">
+                                                <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </div>
+                                        </div>
+                                    )}
                                     <div ref={messagesEndRef} />
                                 </>
                             ) : (
@@ -914,11 +1156,12 @@ export default function MessagesPage() {
                                                         onEmojiClick(emojiData)
                                                         setShowEmojiPicker(false)
                                                     }}
-                                                    theme={Theme.DARK}
+                                                    theme={'dark' as any}
                                                     autoFocusSearch={false}
                                                     width={pickerWidth}
                                                     height={400}
                                                     skinTonesDisabled
+                                                    lazyLoadEmojis={true}
                                                 />
                                             </div>
                                         </div>
@@ -935,15 +1178,42 @@ export default function MessagesPage() {
                                 <div className="flex-1 bg-white/5 border border-white/5 rounded-xl lg:rounded-2xl flex items-center h-10 lg:h-12 px-4 lg:px-6 focus-within:bg-white/[0.08] focus-within:border-white/10 transition-all">
                                     <input
                                         type="text"
-                                        placeholder={editingMessage ? "Update message..." : "Message..."}
+                                        placeholder={isRecording ? "Listening..." : (editingMessage ? "Update message..." : "Message...")}
                                         value={message}
                                         onChange={(e) => handleInput(e.target.value)}
                                         onFocus={() => setShowEmojiPicker(false)}
-                                        className="flex-1 bg-transparent border-none outline-none text-[12px] lg:text-[13px] font-bold text-white placeholder:text-white/20"
+                                        disabled={isRecording}
+                                        className="flex-1 bg-transparent border-none outline-none text-[12px] lg:text-[13px] font-bold text-white placeholder:text-white/20 disabled:text-white/40"
                                     />
+
+                                    {/* Recording Indicator */}
+                                    {isRecording && (
+                                        <div className="absolute left-16 flex items-center gap-2">
+                                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                            <span className="text-xs font-bold text-red-500">{formatDuration(recordingTime)}</span>
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center gap-3 lg:gap-4 ml-2">
                                         <AnimatePresence mode="wait">
-                                            {!message.trim() ? (
+                                            {isRecording ? (
+                                                <motion.div
+                                                    key="recording-actions"
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    className="flex items-center gap-4"
+                                                >
+                                                    <button type="button" onClick={cancelRecording} className="text-[10px] font-bold text-white/40 hover:text-white uppercase tracking-wider">Cancel</button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={stopRecording}
+                                                        className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse"
+                                                    >
+                                                        <SendHorizontal className="w-4 h-4 text-white" />
+                                                    </button>
+                                                </motion.div>
+                                            ) : !message.trim() ? (
                                                 <motion.div
                                                     key="empty-actions"
                                                     initial={{ opacity: 0, scale: 0.8 }}
@@ -958,7 +1228,7 @@ export default function MessagesPage() {
                                                             showEmojiPicker ? "text-cyber-pink" : "text-white/40 hover:text-white"
                                                         )}
                                                     />
-                                                    <Mic className="w-5 h-5 text-white/40 hover:text-white cursor-pointer transition-colors" />
+                                                    <Mic onClick={startRecording} className="w-5 h-5 text-white/40 hover:text-cyber-pink cursor-pointer transition-colors" />
                                                     <ImageIcon className="hidden sm:block w-5 h-5 text-white/40 hover:text-white cursor-pointer transition-colors" />
                                                     <div className="hidden lg:block"><GiftIcon /></div>
                                                 </motion.div>
@@ -1007,7 +1277,13 @@ export default function MessagesPage() {
                 <div className="flex-1" />
 
                 {/* Floating Action Button */}
-                <button className="w-14 h-14 bg-[#FF2D6C] rounded-full flex items-center justify-center shadow-[0_15px_30px_rgba(255,45,108,0.3)] hover:scale-110 active:scale-95 transition-all">
+                <button
+                    onClick={() => {
+                        setLiveMode('broadcast')
+                        setShowLiveModal(true)
+                    }}
+                    className="w-14 h-14 bg-[#FF2D6C] rounded-full flex items-center justify-center shadow-[0_15px_30px_rgba(255,45,108,0.3)] hover:scale-110 active:scale-95 transition-all"
+                >
                     <Video className="w-7 h-7 text-white fill-white" />
                 </button>
             </div>
@@ -1086,6 +1362,15 @@ export default function MessagesPage() {
                 channelName={incomingCall?.channelName || ''}
                 onAccept={handleAcceptCall}
                 onDecline={handleDeclineCall}
+            />
+
+            {/* Live Stream Modal */}
+            <LiveStreamModal
+                isOpen={showLiveModal}
+                onClose={() => setShowLiveModal(false)}
+                mode={liveMode}
+                watchUrl={liveStreamUrl}
+                broadcasterName={currentBroadcasterName}
             />
         </div>
     )
