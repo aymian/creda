@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import { motion } from "framer-motion"
 import {
+    Gamepad2,
     LayoutDashboard,
     Compass,
     Target,
@@ -24,6 +25,7 @@ import { usePathname } from "next/navigation"
 const SIDEBAR_ITEMS = [
     { icon: LayoutDashboard, label: "Intelligence", href: "/", id: "feed" },
     { icon: Compass, label: "Discovery", href: "/explore", id: "explore" },
+    { icon: Gamepad2, label: "Arcade", href: "/game", id: "arcade" },
     { icon: Target, label: "Missions", href: "/focus", id: "focus" },
     { icon: Zap, label: "Activity", href: "/streaks", id: "streaks" },
     { icon: BookOpen, label: "Vault", href: "/library", id: "library" },

@@ -180,7 +180,7 @@ export function UserDropdown() {
 
                             {/* Programs Section */}
                             <div className="py-2">
-                                <Link href="/games">
+                                <Link href="/game">
                                     <MenuItem icon={Dices} label="Games" />
                                 </Link>
 
