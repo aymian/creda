@@ -161,7 +161,6 @@ export default function OnboardingPage() {
         if (step === 6 && !isUsernameAvailable) return // Username check
         if (step === 7 && !formData.gender) return
         if (step === 8 && !formData.bio) return
-        if (step === 9 && !formData.photoURL) return
 
         saveProgress()
         setStep(prev => prev + 1)
@@ -558,10 +557,9 @@ export default function OnboardingPage() {
                                     </label>
                                     <button
                                         onClick={nextStep}
-                                        disabled={!formData.photoURL}
-                                        className="text-white/20 font-black text-xs uppercase tracking-[0.2em] hover:text-white transition-colors disabled:opacity-0"
+                                        className="text-white/40 font-black text-xs uppercase tracking-[0.2em] hover:text-white transition-colors bg-white/5 py-3 px-8 rounded-full border border-white/5 hover:bg-white/10"
                                     >
-                                        Continue
+                                        {formData.photoURL ? "Continue" : "Skip for now"}
                                     </button>
                                 </div>
                             </motion.div>
