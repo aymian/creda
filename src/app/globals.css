@@ -182,6 +182,10 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 45, 108, 0.4);
   }
+
+  .hide-bottom-nav {
+    display: none !important;
+  }
 }
 
 @layer base {

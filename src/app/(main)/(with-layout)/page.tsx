@@ -111,8 +111,8 @@ export default function Home() {
         return (
             <div className="min-h-screen bg-[#0C0C0C] flex items-center justify-center p-6 sm:p-12 lg:p-24 overflow-hidden relative">
                 {/* Background Glows */}
-                <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-cyber-pink/5 rounded-full blur-[140px] pointer-events-none" />
-                <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[140px] pointer-events-none" />
+                <div className="absolute top-1/4 -left-20 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-cyber-pink/5 rounded-full blur-[100px] md:blur-[140px] pointer-events-none" />
+                <div className="absolute bottom-1/4 -right-20 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-purple-900/10 rounded-full blur-[100px] md:blur-[140px] pointer-events-none" />
 
                 <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center relative z-10">
                     <motion.div
@@ -135,7 +135,7 @@ export default function Home() {
                         </motion.div>
 
                         {/* Headline */}
-                        <h1 className="text-5xl sm:text-7xl md:text-8xl font-black text-white leading-[0.85] tracking-tighter mb-8">
+                        <h1 className="text-4xl sm:text-7xl md:text-8xl font-black text-white leading-[0.85] tracking-tighter mb-8">
                             READY TO <span className="text-cyber-pink italic">UNLEASH</span> <br />
                             YOUR FULL POTENTIAL?
                         </h1>
@@ -316,7 +316,28 @@ export default function Home() {
                 )}
             </AnimatePresence>
 
-            <div className="max-w-[1800px] mx-auto px-4 md:px-12 space-y-12">
+            {/* Mobile Feed Tabs */}
+            <div className="lg:hidden sticky top-20 z-40 bg-[#0C0C0C]/80 backdrop-blur-xl border-b border-white/5 px-6 flex items-center justify-center gap-8 h-14 mb-8">
+                {['foryou', 'following'].map((tab) => (
+                    <button
+                        key={tab}
+                        className={cn(
+                            "text-[11px] font-black uppercase tracking-[0.2em] relative transition-colors",
+                            tab === 'foryou' ? "text-white" : "text-white/40"
+                        )}
+                    >
+                        {tab === 'foryou' ? 'For You' : 'Following'}
+                        {tab === 'foryou' && (
+                            <motion.div
+                                layoutId="mobile-tab-underline"
+                                className="absolute -bottom-1 left-0 right-0 h-0.5 bg-cyber-pink rounded-full"
+                            />
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            <div className="max-w-[1800px] mx-auto px-4 md:px-12 space-y-6 md:space-y-12">
 
                 {/* Empty State */}
                 {posts.length === 0 && !loading && (

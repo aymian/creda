@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Search,
@@ -14,10 +15,23 @@ import {
     Gift,
     Star,
     MessageSquare,
-    MoreVertical,
     ArrowDown,
-    Loader2
+    Loader2,
+    CornerUpLeft,
+    Edit2,
+    Trash2,
+    X,
+    Clock,
+    MessageCircle,
+    ArrowLeft,
+    Phone,
+    Mic,
+    SendHorizontal,
+    Camera
 } from "lucide-react"
+import EmojiPicker, { Theme } from 'emoji-picker-react'
+import IncomingCallModal from '@/components/IncomingCallModal'
+import { initiateCall, updateCallStatus, sendMissedCallMessage } from '@/lib/callNotifications'
 import { db, auth } from "@/lib/firebase"
 import {
     collection,
@@ -33,9 +47,11 @@ import {
     getDoc,
     limit,
     increment,
-    setDoc
+    setDoc,
+    deleteDoc
 } from "firebase/firestore"
 import { useAuth } from "@/context/AuthContext"
+import { cn } from "@/lib/utils"
 
 // Custom AI Icon to match screenshot
 const AiIcon = () => (
@@ -49,15 +65,118 @@ const GiftIcon = () => (
 )
 
 
+interface Message {
+    id: string
+    text: string
+    senderId: string
+    timestamp: any
+    status: 'sent' | 'read'
+    isEdited?: boolean
+    editedAt?: any
+    replyTo?: {
+        id: string
+        text: string
+        senderName: string
+    } | null
+}
+
+interface Conversation {
+    id: string
+    participants: string[]
+    lastMessage?: string
+    lastMessageTime?: any
+    lastMessageSenderId?: string
+    unreadCounts?: Record<string, number>
+    typing?: Record<string, boolean>
+    onlineStatus?: Record<string, boolean>
+    hasEmoji?: boolean
+}
+
 export default function MessagesPage() {
     const { user } = useAuth()
+    const router = useRouter()
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [message, setMessage] = useState("")
-    const [conversations, setConversations] = useState<any[]>([])
-    const [messages, setMessages] = useState<any[]>([])
+    const [conversations, setConversations] = useState<Conversation[]>([])
+    const [messages, setMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(true)
     const [userProfiles, setUserProfiles] = useState<Record<string, any>>({})
+    const [replyingTo, setReplyingTo] = useState<any | null>(null)
+    const [editingMessage, setEditingMessage] = useState<any | null>(null)
+    const [searchTerm, setSearchTerm] = useState("")
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+    const [showContextMenu, setShowContextMenu] = useState<{ id: string, x: number, y: number } | null>(null)
+    const [otherUserTyping, setOtherUserTyping] = useState(false)
+    const [isSidebarVisible, setIsSidebarVisible] = useState(true)
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const [isHeaderHidden, setIsHeaderHidden] = useState(false)
+    const [pickerWidth, setPickerWidth] = useState(350)
+    const [showScrollDown, setShowScrollDown] = useState(false)
+    const [viewportHeight, setViewportHeight] = useState('calc(100vh - 64px)')
+    const [messageToManage, setMessageToManage] = useState<any | null>(null)
+    const [incomingCall, setIncomingCall] = useState<any | null>(null)
+    const [currentCallId, setCurrentCallId] = useState<string | null>(null)
+
+    // Handle Visual Viewport (Mobile Keyboard)
+    useEffect(() => {
+        if (!window.visualViewport) return
+
+        const handleViewport = () => {
+            const height = window.visualViewport?.height || window.innerHeight
+            const headerHeight = 64
+            setViewportHeight(`${height - (isHeaderHidden ? 0 : headerHeight)}px`)
+        }
+
+        window.visualViewport.addEventListener('resize', handleViewport)
+        handleViewport()
+        return () => window.visualViewport?.removeEventListener('resize', handleViewport)
+    }, [isHeaderHidden])
+
+    // Handle Scroll Listener for Scroll-Down Button
+    const handleScroll = () => {
+        if (!messagesContainerRef.current) return
+        const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 200
+        setShowScrollDown(!isNearBottom)
+    }
+
+    useEffect(() => {
+        const updateWidth = () => {
+            setPickerWidth(window.innerWidth < 640 ? 300 : 350)
+        }
+        updateWidth()
+        window.addEventListener('resize', updateWidth)
+        return () => window.removeEventListener('resize', updateWidth)
+    }, [])
+
+    const onEmojiClick = (emojiData: any) => {
+        setMessage(prev => prev + emojiData.emoji)
+    }
+
+    // Handle global header visibility on mobile
+    useEffect(() => {
+        const handleHeader = () => {
+            const header = document.getElementById('global-header')
+            const isMobile = window.innerWidth < 1024
+            if (isMobile && !isSidebarVisible && selectedId) {
+                if (header) header.style.transform = 'translateY(-100%)'
+                setIsHeaderHidden(true)
+            } else {
+                if (header) header.style.transform = 'translateY(0)'
+                setIsHeaderHidden(false)
+            }
+        }
+
+        handleHeader()
+        window.addEventListener('resize', handleHeader)
+        return () => {
+            const header = document.getElementById('global-header')
+            if (header) header.style.transform = 'translateY(0)'
+            window.removeEventListener('resize', handleHeader)
+        }
+    }, [isSidebarVisible, selectedId])
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -78,10 +197,10 @@ export default function MessagesPage() {
         )
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
-            const convs = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }))
+            const convs = snapshot.docs.map(cvDoc => ({
+                id: cvDoc.id,
+                ...cvDoc.data()
+            } as Conversation))
 
             // Collect all unique participant IDs that aren't the current user
             const profileIds = new Set<string>()
@@ -126,6 +245,57 @@ export default function MessagesPage() {
         return () => unsubscribe()
     }, [user, selectedId])
 
+    // Listen for incoming calls
+    useEffect(() => {
+        if (!user) return
+
+        // Simplified query without orderBy to avoid index requirement
+        const callsQuery = query(
+            collection(db, 'calls'),
+            where('receiverId', '==', user.uid),
+            where('status', '==', 'ringing')
+        )
+
+        const unsubscribe = onSnapshot(callsQuery, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    const callData = { id: change.doc.id, ...change.doc.data() }
+                    setIncomingCall(callData)
+                    setCurrentCallId(change.doc.id)
+                }
+            })
+        })
+
+        return () => unsubscribe()
+    }, [user])
+
+    const handleAcceptCall = async () => {
+        if (!currentCallId || !incomingCall) return
+
+        await updateCallStatus(currentCallId, 'accepted')
+        router.push(`/call?type=${incomingCall.callType}&username=${incomingCall.callerName}&channel=${incomingCall.channelName}&caller=false`)
+        setIncomingCall(null)
+        setCurrentCallId(null)
+    }
+
+    const handleDeclineCall = async () => {
+        if (!currentCallId || !incomingCall) return
+
+        await updateCallStatus(currentCallId, 'declined')
+
+        // Send missed call message
+        const conversationId = conversations.find(c =>
+            c.participants.includes(incomingCall.callerId)
+        )?.id
+
+        if (conversationId) {
+            await sendMissedCallMessage(conversationId, incomingCall.callerId, incomingCall.callType)
+        }
+
+        setIncomingCall(null)
+        setCurrentCallId(null)
+    }
+
     // Fetch messages for selected conversation
     useEffect(() => {
         if (!selectedId) return
@@ -136,11 +306,32 @@ export default function MessagesPage() {
         )
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const msgs = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }))
+            const msgs = snapshot.docs.map(mDoc => ({
+                id: mDoc.id,
+                ...mDoc.data()
+            } as Message))
             setMessages(msgs)
+
+            // Mark messages as read efficiently
+            const unreadMsgs = msgs.filter(m => m.senderId !== user?.uid && m.status !== 'read')
+            if (unreadMsgs.length > 0 && selectedId) {
+                unreadMsgs.forEach((msg) => {
+                    updateDoc(doc(db, "conversations", selectedId, "messages", msg.id), {
+                        status: 'read'
+                    }).catch(e => console.error("Error marking message read:", e))
+                })
+            }
+        })
+
+        // Listen for typing status
+        const convUnsubscribe = onSnapshot(doc(db, "conversations", selectedId), (snapshot) => {
+            const data = snapshot.data()
+            const otherId = data?.participants.find((p: string) => p !== user?.uid)
+            if (otherId && data?.typing?.[otherId]) {
+                setOtherUserTyping(true)
+            } else {
+                setOtherUserTyping(false)
+            }
         })
 
         // Reset unread count for current user
@@ -156,34 +347,84 @@ export default function MessagesPage() {
         }
         resetUnread()
 
-        return () => unsubscribe()
+        return () => {
+            unsubscribe()
+            convUnsubscribe()
+        }
     }, [selectedId, user])
+
+    // Typing Status Logic
+    const handleInput = (val: string) => {
+        setMessage(val)
+        if (!user || !selectedId) return
+
+        // Set typing true
+        updateDoc(doc(db, "conversations", selectedId), {
+            [`typing.${user.uid}`]: true
+        })
+
+        // Clear previous timeout
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+
+        // Set timeout to clear typing status
+        typingTimeoutRef.current = setTimeout(() => {
+            updateDoc(doc(db, "conversations", selectedId), {
+                [`typing.${user.uid}`]: false
+            })
+        }, 3000)
+    }
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault()
         if (!message.trim() || !selectedId || !user) return
 
         const messageText = message
+        const currentReplyingTo = replyingTo
+        const currentEditingMsg = editingMessage
+
         setMessage("")
+        setReplyingTo(null)
+        setEditingMessage(null)
 
         try {
             const convDoc = doc(db, "conversations", selectedId)
             const chat = conversations.find(c => c.id === selectedId)
             const otherParticipantId = chat?.participants.find((p: string) => p !== user.uid)
 
-            // Add message to subcollection
+            if (currentEditingMsg) {
+                // UPDATE Existing
+                await updateDoc(doc(db, "conversations", selectedId, "messages", currentEditingMsg.id), {
+                    text: messageText,
+                    isEdited: true,
+                    editedAt: serverTimestamp()
+                })
+
+                // Update last message if it was the last one
+                if (chat?.lastMessage === currentEditingMsg.text) {
+                    await updateDoc(convDoc, { lastMessage: messageText })
+                }
+                return
+            }
+
+            // ADD New
             await addDoc(collection(db, "conversations", selectedId, "messages"), {
                 text: messageText,
                 senderId: user.uid,
                 timestamp: serverTimestamp(),
-                status: 'sent'
+                status: 'sent',
+                replyTo: currentReplyingTo ? {
+                    id: currentReplyingTo.id,
+                    text: currentReplyingTo.text,
+                    senderName: userProfiles[currentReplyingTo.senderId]?.displayName || "User"
+                } : null
             })
 
             // Update parent conversation
             const updateData: any = {
                 lastMessage: messageText,
                 lastMessageTime: serverTimestamp(),
-                lastMessageSenderId: user.uid
+                lastMessageSenderId: user.uid,
+                [`typing.${user.uid}`]: false
             }
 
             // Increment unread count for other participant
@@ -194,6 +435,16 @@ export default function MessagesPage() {
             await updateDoc(convDoc, updateData)
         } catch (error) {
             console.error("Error sending message:", error)
+        }
+    }
+
+    const handleDeleteMessage = async (msgId: string) => {
+        if (!selectedId) return
+        try {
+            await deleteDoc(doc(db, "conversations", selectedId, "messages", msgId))
+            setShowContextMenu(null)
+        } catch (e) {
+            console.error("Error deleting message:", e)
         }
     }
 
@@ -237,22 +488,32 @@ export default function MessagesPage() {
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] bg-[#0C0C0C] text-white flex overflow-hidden font-sans">
+        <div
+            className={cn(
+                "bg-[#0C0C0C] text-white flex overflow-hidden font-sans relative transition-all duration-300",
+                isHeaderHidden ? "fixed inset-0 z-[55]" : "relative"
+            )}
+            style={{ height: viewportHeight }}
+        >
 
             {/* Left Sidebar */}
-            <div className="w-[380px] border-r border-white/5 flex flex-col bg-[#0C0C0C]">
+            <div className={cn(
+                "w-full lg:w-[380px] border-r border-white/5 flex flex-col bg-[#0C0C0C] transition-all duration-300 absolute lg:relative z-50 lg:z-30 h-full",
+                isSidebarVisible ? "left-0" : "-left-full lg:left-0"
+            )}>
 
-                {/* Header: Message Requests */}
-                <div className="p-5 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 bg-white/5 rounded-lg flex items-center justify-center">
-                            <Inbox className="w-4 h-4 text-white/60" />
-                        </div>
-                        <h2 className="text-sm font-bold tracking-tight">Message Requests</h2>
+                {/* Sidebar Search */}
+                <div className="px-5 py-3">
+                    <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-cyber-pink transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Search interactions..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-cyber-pink/50 transition-all placeholder:text-white/10"
+                        />
                     </div>
-                    <button className="px-5 py-2 bg-white/5 hover:bg-white/10 rounded-full text-[11px] font-black transition-all">
-                        View
-                    </button>
                 </div>
 
                 {/* Filters */}
@@ -267,56 +528,72 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Chat List */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {conversations.length > 0 ? conversations.map((chat) => {
-                        const info = getChatHeaderInfo(chat)
-                        return (
-                            <div
-                                key={chat.id}
-                                onClick={() => setSelectedId(chat.id)}
-                                className={`px-4 py-1 cursor-pointer transition-all`}
-                            >
-                                <div className={`flex items-center gap-3 p-3 rounded-2xl relative transition-all ${selectedId === chat.id ? 'bg-[#FF2D6C]' : 'hover:bg-white/5'}`}>
-                                    <div className="relative shrink-0">
-                                        <img
-                                            src={info.avatar}
-                                            className="w-12 h-12 rounded-full border border-white/10 object-cover"
-                                            alt=""
-                                        />
-                                        {chat.onlineStatus?.[chat.participants.find((p: string) => p !== user?.uid)] && (
-                                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0C0C0C]" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-baseline mb-0.5">
-                                            <h3 className="font-bold text-[13px] truncate flex items-center gap-1">
-                                                {info.name}
-                                                {chat.hasEmoji && <span>🔥</span>}
-                                                {info.verified && (
-                                                    <div className="w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center">
-                                                        <Check className="w-2.5 h-2.5 text-[#FF2D6C]" strokeWidth={5} />
-                                                    </div>
-                                                )}
-                                            </h3>
-                                            <span className={`text-[10px] ${selectedId === chat.id ? 'text-white/60' : 'text-white/20'}`}>
-                                                {formatDateShort(chat.lastMessageTime)}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className={`text-[12px] truncate ${selectedId === chat.id ? 'text-white/80' : 'text-white/40'}`}>
-                                                {chat.lastMessage || "No messages yet"}
-                                            </p>
-                                            {info.unread > 0 && selectedId !== chat.id && (
-                                                <div className="min-w-[18px] h-[18px] bg-white text-[#FF2D6C] rounded-full flex items-center justify-center text-[10px] font-black px-1">
-                                                    {info.unread}
+                <div className="flex-1 overflow-y-auto custom-scrollbar pb-32 lg:pb-0">
+                    {conversations
+                        .filter(chat => {
+                            const info = getChatHeaderInfo(chat)
+                            return info.name.toLowerCase().includes(searchTerm.toLowerCase())
+                        })
+                        .length > 0 ? conversations
+                            .filter(chat => {
+                                const info = getChatHeaderInfo(chat)
+                                return info.name.toLowerCase().includes(searchTerm.toLowerCase())
+                            })
+                            .map((chat) => {
+                                const info = getChatHeaderInfo(chat)
+                                return (
+                                    <div
+                                        key={chat.id}
+                                        onClick={() => {
+                                            setSelectedId(chat.id)
+                                            setIsSidebarVisible(false)
+                                        }}
+                                        className={`px-4 py-1 cursor-pointer transition-all`}
+                                    >
+                                        <div className={`flex items-center gap-3 p-3 rounded-2xl relative transition-all ${selectedId === chat.id ? 'bg-[#FF2D6C]' : 'hover:bg-white/5'}`}>
+                                            <div className="relative shrink-0">
+                                                <img
+                                                    src={info.avatar}
+                                                    className="w-12 h-12 rounded-full border border-white/10 object-cover"
+                                                    alt=""
+                                                />
+                                                {(() => {
+                                                    const otherId = chat.participants.find((p: string) => p !== user?.uid)
+                                                    return otherId && chat.onlineStatus?.[otherId] ? (
+                                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0C0C0C]" />
+                                                    ) : null
+                                                })()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-baseline mb-0.5">
+                                                    <h3 className="font-bold text-[13px] truncate flex items-center gap-1">
+                                                        {info.name}
+                                                        {chat.hasEmoji && <span>🔥</span>}
+                                                        {info.verified && (
+                                                            <div className="w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center">
+                                                                <Check className="w-2.5 h-2.5 text-[#FF2D6C]" strokeWidth={5} />
+                                                            </div>
+                                                        )}
+                                                    </h3>
+                                                    <span className={`text-[10px] ${selectedId === chat.id ? 'text-white/60' : 'text-white/20'}`}>
+                                                        {formatDateShort(chat.lastMessageTime)}
+                                                    </span>
                                                 </div>
-                                            )}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className={`text-[12px] truncate ${selectedId === chat.id ? 'text-white/80' : 'text-white/40'}`}>
+                                                        {chat.lastMessage || "No messages yet"}
+                                                    </p>
+                                                    {info.unread > 0 && selectedId !== chat.id && (
+                                                        <div className="min-w-[18px] h-[18px] bg-white text-[#FF2D6C] rounded-full flex items-center justify-center text-[10px] font-black px-1">
+                                                            {info.unread}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        )
-                    }) : (
+                                )
+                            }) : (
                         <div className="p-10 text-center opacity-20">
                             <MessageSquare className="w-10 h-10 mx-auto mb-2" />
                             <p className="text-xs font-bold uppercase">No comms found</p>
@@ -346,46 +623,200 @@ export default function MessagesPage() {
                 {selectedId ? (
                     <>
                         {/* Chat Header */}
-                        <div className="h-20 px-8 flex items-center justify-between border-b border-white/5 bg-[#0C0C0C]">
-                            <div className="flex items-center gap-4">
-                                <img
-                                    src={getChatHeaderInfo(conversations.find(c => c.id === selectedId)).avatar}
-                                    className="w-10 h-10 rounded-full border border-white/10 object-cover"
-                                    alt=""
-                                />
-                                <h2 className="font-bold text-[15px] flex items-center gap-1.5">
-                                    {getChatHeaderInfo(conversations.find(c => c.id === selectedId)).name}
-                                    {conversations.find(c => c.id === selectedId)?.hasEmoji && <span>🔥</span>}
-                                    {getChatHeaderInfo(conversations.find(c => c.id === selectedId)).verified && (
-                                        <div className="w-4 h-4 bg-[#FF2D6C] rounded-full flex items-center justify-center">
-                                            <Check className="w-2.5 h-2.5 text-white" strokeWidth={5} />
-                                        </div>
+                        <div className="h-16 lg:h-20 px-4 lg:px-8 flex items-center justify-between border-b border-white/5 bg-[#0C0C0C]/80 backdrop-blur-xl sticky top-0 z-40">
+                            <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
+                                <button
+                                    onClick={() => setIsSidebarVisible(true)}
+                                    className="lg:hidden p-2 -ml-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white transition-colors"
+                                >
+                                    <ArrowLeft className="w-6 h-6" />
+                                </button>
+                                <div className="relative shrink-0">
+                                    <img
+                                        src={getChatHeaderInfo(conversations.find(c => c.id === selectedId)).avatar}
+                                        className="w-8 h-8 lg:w-10 lg:h-10 rounded-full border border-white/10 object-cover"
+                                        alt=""
+                                    />
+                                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#0C0C0C]" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <h2 className="font-bold text-[14px] lg:text-[15px] flex items-center gap-1.5 truncate">
+                                        {getChatHeaderInfo(conversations.find(c => c.id === selectedId)).name}
+                                        {getChatHeaderInfo(conversations.find(c => c.id === selectedId)).verified && (
+                                            <div className="w-3.5 h-3.5 bg-[#FF2D6C] rounded-full flex items-center justify-center shrink-0">
+                                                <Check className="w-2.5 h-2.5 text-white" strokeWidth={5} />
+                                            </div>
+                                        )}
+                                    </h2>
+                                    {otherUserTyping ? (
+                                        <span className="text-[10px] font-black uppercase text-cyber-pink tracking-widest animate-pulse">Typing...</span>
+                                    ) : (
+                                        <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Active Now</span>
                                     )}
-                                </h2>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-5">
-                                <AiIcon />
-                                <MoreHorizontal className="w-6 h-6 text-white/40 hover:text-white cursor-pointer transition-all" />
+                            <div className="flex items-center gap-2 lg:gap-4">
+                                <button
+                                    onClick={async () => {
+                                        const otherUserId = conversations.find(c => c.id === selectedId)?.participants.find(p => p !== user?.uid)
+                                        const otherUserProfile = otherUserId ? userProfiles[otherUserId] : null
+                                        const channelName = selectedId || 'default'
+
+                                        // Get the actual display name with multiple fallbacks
+                                        const displayName = otherUserProfile?.displayName ||
+                                            otherUserProfile?.name ||
+                                            otherUserProfile?.username ||
+                                            'Unknown User'
+
+                                        if (user && otherUserId) {
+                                            await initiateCall(
+                                                user.uid,
+                                                user.displayName || user.email?.split('@')[0] || 'Unknown',
+                                                user.photoURL || undefined,
+                                                otherUserId,
+                                                'audio',
+                                                channelName
+                                            )
+                                            router.push(`/call?type=audio&username=${encodeURIComponent(displayName)}&channel=${channelName}&caller=true`)
+                                        }
+                                    }}
+                                    className="w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/40 hover:text-white"
+                                >
+                                    <Phone className="w-4 h-4 lg:w-5 lg:h-5" />
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        const otherUserId = conversations.find(c => c.id === selectedId)?.participants.find(p => p !== user?.uid)
+                                        const otherUserProfile = otherUserId ? userProfiles[otherUserId] : null
+                                        const channelName = selectedId || 'default'
+
+                                        // Get the actual display name with multiple fallbacks
+                                        const displayName = otherUserProfile?.displayName ||
+                                            otherUserProfile?.name ||
+                                            otherUserProfile?.username ||
+                                            'Unknown User'
+
+                                        if (user && otherUserId) {
+                                            await initiateCall(
+                                                user.uid,
+                                                user.displayName || user.email?.split('@')[0] || 'Unknown',
+                                                user.photoURL || undefined,
+                                                otherUserId,
+                                                'video',
+                                                channelName
+                                            )
+                                            router.push(`/call?type=video&username=${encodeURIComponent(displayName)}&channel=${channelName}&caller=true`)
+                                        }
+                                    }}
+                                    className="w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/40 hover:text-white"
+                                >
+                                    <Video className="w-4 h-4 lg:w-5 lg:h-5" />
+                                </button>
+                                <div className="hidden lg:block w-px h-6 bg-white/10 mx-1" />
+                                <button className="p-2 text-white/40 hover:text-white transition-all">
+                                    <MoreHorizontal className="w-5 h-5 lg:w-6 lg:h-6" />
+                                </button>
                             </div>
                         </div>
 
                         {/* Messages Container */}
-                        <div className="flex-1 overflow-y-auto p-10 flex flex-col gap-6 custom-scrollbar">
+                        <div
+                            ref={messagesContainerRef}
+                            onScroll={handleScroll}
+                            className="flex-1 overflow-y-auto p-4 lg:p-10 flex flex-col gap-4 lg:gap-6 custom-scrollbar relative"
+                        >
                             {messages.length > 0 ? (
                                 <>
                                     {messages.map((msg, idx) => {
                                         const isMe = msg.senderId === user?.uid
                                         return (
-                                            <div key={msg.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                                <div className={`max-w-[70%] px-5 py-3 rounded-2xl text-[14px] ${isMe ? 'bg-[#FF2D6C] text-white' : 'bg-white/5 text-white/80'}`}>
+                                            <div
+                                                key={msg.id || idx}
+                                                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group relative`}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault()
+                                                    setShowContextMenu({ id: msg.id, x: e.clientX, y: e.clientY })
+                                                }}
+                                            >
+                                                {msg.replyTo && (
+                                                    <div className="mb-1 flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border-l-2 border-cyber-pink max-w-[50%] opacity-60">
+                                                        <CornerUpLeft className="w-3 h-3 text-cyber-pink" />
+                                                        <p className="text-[10px] truncate">{msg.replyTo.text}</p>
+                                                    </div>
+                                                )}
+                                                <motion.div
+                                                    key={msg.id || idx}
+                                                    drag="x"
+                                                    dragConstraints={{ left: 0, right: 100 }}
+                                                    dragElastic={0.2}
+                                                    onDragEnd={(_, info) => {
+                                                        if (info.offset.x > 50) setReplyingTo(msg)
+                                                    }}
+                                                    className={`max-w-[75%] px-5 py-3 rounded-2xl text-[14px] relative transition-all cursor-pointer ${isMe ? 'bg-[#FF2D6C] text-white' : 'bg-white/5 text-white/80'} group-hover:scale-[1.02]`}
+                                                    onDoubleClick={() => {
+                                                        if (isMe) setMessageToManage(msg)
+                                                    }}
+                                                >
                                                     {msg.text}
-                                                </div>
+                                                    {msg.isEdited && (
+                                                        <span className="text-[9px] opacity-40 italic block mt-1">Edited</span>
+                                                    )}
+
+                                                    {/* Swipe to reply indicator */}
+                                                    <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-drag:opacity-100 transition-opacity">
+                                                        <CornerUpLeft className="w-5 h-5 text-cyber-pink" />
+                                                    </div>
+                                                </motion.div>
                                                 <div className="mt-1 flex items-center gap-2 px-1">
                                                     <span className="text-[10px] font-black text-white/20 uppercase">
                                                         {formatTime(msg.timestamp)}
                                                     </span>
-                                                    {isMe && <Check className="w-3 h-3 text-white/20" />}
+                                                    {isMe && (
+                                                        <div className="flex items-center">
+                                                            <Check className={`w-3 h-3 ${msg.status === 'read' ? 'text-[#00F3FF]' : 'text-white/20'}`} />
+                                                            {msg.status === 'read' && <Check className="w-3 h-3 text-[#00F3FF] -ml-1.5" />}
+                                                        </div>
+                                                    )}
                                                 </div>
+
+                                                <AnimatePresence>
+                                                    {showContextMenu && showContextMenu.id === msg.id && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.9 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.9 }}
+                                                            className="fixed z-50 bg-[#1A1A1A] border border-white/10 rounded-2xl p-2 shadow-2xl flex flex-col gap-1 min-w-[140px]"
+                                                            style={{
+                                                                left: Math.min(showContextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 160),
+                                                                top: Math.min(showContextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 1000) - 200)
+                                                            }}
+                                                            onMouseLeave={() => setShowContextMenu(null)}
+                                                        >
+                                                            <button
+                                                                onClick={() => { setReplyingTo(msg); setShowContextMenu(null); }}
+                                                                className="flex items-center gap-3 w-full px-3 py-2 hover:bg-white/5 rounded-xl text-[12px] font-bold transition-all text-white/60 hover:text-white"
+                                                            >
+                                                                <CornerUpLeft className="w-4 h-4" /> Reply
+                                                            </button>
+                                                            {isMe && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => { setEditingMessage(msg); setMessage(msg.text); setShowContextMenu(null); }}
+                                                                        className="flex items-center gap-3 w-full px-3 py-2 hover:bg-white/5 rounded-xl text-[12px] font-bold transition-all text-white/60 hover:text-white"
+                                                                    >
+                                                                        <Edit2 className="w-4 h-4" /> Edit
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteMessage(msg.id)}
+                                                                        className="flex items-center gap-3 w-full px-3 py-2 hover:bg-red-500/10 rounded-xl text-[12px] font-bold transition-all text-red-500 hover:text-red-400"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" /> Unsend
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                         )
                                     })}
@@ -405,47 +836,160 @@ export default function MessagesPage() {
                             )}
 
                             {/* Floating Scroll Down button */}
-                            <div className="absolute bottom-40 right-10 z-10 w-11 h-11 bg-white/5 border border-white/10 rounded-full flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer">
-                                <ArrowDown className="w-5 h-5 opacity-60" />
-                            </div>
+                            <AnimatePresence>
+                                {showScrollDown && (
+                                    <motion.button
+                                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.5, y: 20 }}
+                                        onClick={scrollToBottom}
+                                        className="fixed bottom-32 lg:bottom-40 right-6 lg:right-1/4 z-40 w-12 h-12 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center hover:bg-white/20 transition-all shadow-2xl"
+                                    >
+                                        <ArrowDown className="w-6 h-6 text-white" />
+                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-cyber-pink rounded-full border-2 border-[#0C0C0C]" />
+                                    </motion.button>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         {/* Footer: Input and Sticker Toolbar */}
-                        <div className="p-8 pb-10 flex flex-col items-center gap-4">
+                        <div className="p-4 lg:p-8 pb-32 lg:pb-10 flex flex-col items-center gap-2 lg:gap-4 relative">
+
+                            {/* Reply/Edit Previews */}
+                            <AnimatePresence>
+                                {replyingTo && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="w-full max-w-3xl bg-[#1A1A1A]/90 border border-white/5 p-3 lg:p-4 rounded-2xl flex items-center justify-between mb-1 backdrop-blur-xl"
+                                    >
+                                        <div className="flex flex-col gap-1 overflow-hidden">
+                                            <div className="flex items-center gap-2">
+                                                <CornerUpLeft className="w-3 h-3 text-[#FF2D6C]" />
+                                                <span className="text-[10px] font-black uppercase text-[#FF2D6C]">Replying to {userProfiles[replyingTo.senderId]?.displayName || "User"}</span>
+                                            </div>
+                                            <p className="text-[11px] lg:text-[12px] opacity-40 truncate">{replyingTo.text}</p>
+                                        </div>
+                                        <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-white/10 rounded-full transition-all">
+                                            <X className="w-4 h-4 opacity-40" />
+                                        </button>
+                                    </motion.div>
+                                )}
+                                {editingMessage && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="w-full max-w-3xl bg-[#1A1A1A]/90 border border-white/5 p-3 lg:p-4 rounded-2xl flex items-center justify-between mb-1 backdrop-blur-xl"
+                                    >
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <Edit2 className="w-3 h-3 text-[#00F3FF]" />
+                                                <span className="text-[10px] font-black uppercase text-[#00F3FF]">Editing Message</span>
+                                            </div>
+                                            <p className="text-[11px] lg:text-[12px] opacity-40 truncate">{editingMessage.text}</p>
+                                        </div>
+                                        <button onClick={() => { setEditingMessage(null); setMessage(""); }} className="p-1.5 hover:bg-white/10 rounded-full transition-all">
+                                            <X className="w-4 h-4 opacity-40" />
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Emoji Picker Popover */}
+                            <AnimatePresence>
+                                {showEmojiPicker && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute bottom-full right-4 lg:right-auto lg:left-1/2 lg:-translate-x-1/2 mb-4 z-[60]"
+                                    >
+                                        <div className="relative group">
+                                            <div className="absolute -inset-1 bg-gradient-to-r from-cyber-pink to-cyber-cyan rounded-[2rem] opacity-20 blur group-hover:opacity-40 transition duration-1000"></div>
+                                            <div className="relative">
+                                                <EmojiPicker
+                                                    onEmojiClick={(emojiData) => {
+                                                        onEmojiClick(emojiData)
+                                                        setShowEmojiPicker(false)
+                                                    }}
+                                                    theme={Theme.DARK}
+                                                    autoFocusSearch={false}
+                                                    width={pickerWidth}
+                                                    height={400}
+                                                    skinTonesDisabled
+                                                />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
                             {/* Input Bar */}
-                            <form onSubmit={handleSendMessage} className="w-full max-w-3xl flex items-center gap-4">
-                                <button type="button" className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/5">
-                                    <Plus className="w-6 h-6 opacity-40" />
+                            <form onSubmit={handleSendMessage} className="w-full max-w-3xl flex items-center gap-2 lg:gap-4 relative">
+                                <button type="button" className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl lg:rounded-2xl transition-all border border-white/5 shrink-0">
+                                    <Plus className="w-5 h-5 lg:w-6 lg:h-6 opacity-40" />
                                 </button>
 
-                                <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl flex items-center h-12 px-6 focus-within:bg-white/[0.08] focus-within:border-white/10 transition-all">
+                                <div className="flex-1 bg-white/5 border border-white/5 rounded-xl lg:rounded-2xl flex items-center h-10 lg:h-12 px-4 lg:px-6 focus-within:bg-white/[0.08] focus-within:border-white/10 transition-all">
                                     <input
                                         type="text"
-                                        placeholder="Message..."
+                                        placeholder={editingMessage ? "Update message..." : "Message..."}
                                         value={message}
-                                        onChange={(e) => setMessage(e.target.value)}
-                                        className="flex-1 bg-transparent border-none outline-none text-[13px] font-bold text-white placeholder:text-white/20"
+                                        onChange={(e) => handleInput(e.target.value)}
+                                        onFocus={() => setShowEmojiPicker(false)}
+                                        className="flex-1 bg-transparent border-none outline-none text-[12px] lg:text-[13px] font-bold text-white placeholder:text-white/20"
                                     />
-                                    <div className="flex items-center gap-6">
-                                        <Smile className="w-5 h-5 text-white/40 hover:text-white cursor-pointer" />
-                                        <ImageIcon className="w-5 h-5 text-white/40 hover:text-white cursor-pointer" />
-                                        <GiftIcon />
+                                    <div className="flex items-center gap-3 lg:gap-4 ml-2">
+                                        <AnimatePresence mode="wait">
+                                            {!message.trim() ? (
+                                                <motion.div
+                                                    key="empty-actions"
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    className="flex items-center gap-3 lg:gap-4"
+                                                >
+                                                    <Smile
+                                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                                        className={cn(
+                                                            "w-5 h-5 transition-colors cursor-pointer",
+                                                            showEmojiPicker ? "text-cyber-pink" : "text-white/40 hover:text-white"
+                                                        )}
+                                                    />
+                                                    <Mic className="w-5 h-5 text-white/40 hover:text-white cursor-pointer transition-colors" />
+                                                    <ImageIcon className="hidden sm:block w-5 h-5 text-white/40 hover:text-white cursor-pointer transition-colors" />
+                                                    <div className="hidden lg:block"><GiftIcon /></div>
+                                                </motion.div>
+                                            ) : (
+                                                <motion.button
+                                                    key="send-action"
+                                                    type="submit"
+                                                    initial={{ opacity: 0, x: 10, scale: 0.8 }}
+                                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, x: 10, scale: 0.8 }}
+                                                    className="w-8 h-8 bg-cyber-pink rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,45,108,0.4)] transition-all hover:scale-110 active:scale-95"
+                                                >
+                                                    <SendHorizontal className="w-4 h-4 text-white" />
+                                                </motion.button>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 </div>
                             </form>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center space-y-4 opacity-10">
+                    <div className="hidden lg:flex flex-1 flex flex-col items-center justify-center space-y-4 opacity-10">
                         <MessageSquare className="w-16 h-16" />
                         <h3 className="font-bold">Select a connection</h3>
                     </div>
                 )}
             </div>
 
-            {/* Right Side Control Bar */}
-            <div className="w-[100px] border-l border-white/5 bg-[#0C0C0C] flex flex-col items-center py-10 gap-16">
+            {/* Right Side Control Bar - Hidden on Mobile */}
+            <div className="hidden lg:flex w-[100px] border-l border-white/5 bg-[#0C0C0C] flex flex-col items-center py-10 gap-16">
 
                 {/* Coins Shortcut */}
                 <div className="flex flex-col items-center gap-3 group cursor-pointer">
@@ -484,6 +1028,65 @@ export default function MessagesPage() {
                     background: rgba(255, 255, 255, 0.15);
                 }
             `}</style>
+
+            {/* Simple Modal for Edit/Unsend */}
+            <AnimatePresence>
+                {messageToManage && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="w-full max-w-sm bg-[#1A1A1A] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden relative"
+                        >
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyber-pink to-transparent opacity-50" />
+
+                            <h3 className="text-xl font-black mb-6 text-center tracking-tight">Manage Message</h3>
+
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        setEditingMessage(messageToManage)
+                                        setMessage(messageToManage.text)
+                                        setMessageToManage(null)
+                                    }}
+                                    className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all border border-white/5"
+                                >
+                                    <Edit2 className="w-5 h-5 text-cyber-cyan" /> Edit Message
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        handleDeleteMessage(messageToManage.id)
+                                        setMessageToManage(null)
+                                    }}
+                                    className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all border border-red-500/20 text-red-500"
+                                >
+                                    <Trash2 className="w-5 h-5" /> Unsend
+                                </button>
+
+                                <button
+                                    onClick={() => setMessageToManage(null)}
+                                    className="w-full py-4 mt-2 text-white/40 hover:text-white font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Incoming Call Modal */}
+            <IncomingCallModal
+                isOpen={!!incomingCall}
+                callerName={incomingCall?.callerName || 'Unknown'}
+                callerAvatar={incomingCall?.callerAvatar}
+                callType={incomingCall?.callType || 'audio'}
+                channelName={incomingCall?.channelName || ''}
+                onAccept={handleAcceptCall}
+                onDecline={handleDeclineCall}
+            />
         </div>
     )
 }
