@@ -35,7 +35,12 @@ const rtcConfig = {
     ]
 }
 
-export default function CallPage() {
+import { Suspense } from "react"
+
+// Force dynamic rendering to skip static generation for this page
+export const dynamic = "force-dynamic";
+
+function CallItem() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { user } = useAuth()
@@ -414,5 +419,17 @@ export default function CallPage() {
                 }
             `}</style>
         </div>
+    )
+}
+
+export default function CallPage() {
+    return (
+        <Suspense fallback={
+            <div className="fixed inset-0 bg-[#0C0C0C] flex items-center justify-center">
+                <div className="text-white/40 font-bold">Initializing secure connection...</div>
+            </div>
+        }>
+            <CallItem />
+        </Suspense>
     )
 }

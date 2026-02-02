@@ -7,13 +7,16 @@ import { db } from "@/lib/firebase"
 import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
 import { useAuth } from "@/context/AuthContext"
 import Link from "next/link"
-import dynamic from 'next/dynamic'
+import nextDynamic from 'next/dynamic'
 import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ArrowRight, Star } from "lucide-react"
 
+// Force dynamic rendering to skip static generation for this personalized feed page
+export const dynamic = "force-dynamic";
+
 // Dynamically import the player component to avoid SSR issues with ReactPlayer
-const FeedVideoPlayer = dynamic(() => import('@/components/player/FeedVideoPlayer').then(mod => mod.FeedVideoPlayer), { ssr: false });
+const FeedVideoPlayer = nextDynamic(() => import('@/components/player/FeedVideoPlayer').then(mod => mod.FeedVideoPlayer), { ssr: false });
 
 interface Post {
     id: string
@@ -29,12 +32,11 @@ interface Post {
     createdAt: any
 }
 
-export default function Home() {
-    const { user } = useAuth()
+
+import { Suspense } from "react"
+
+function PremiumWelcomeHandler({ setShowPremiumWelcome }: { setShowPremiumWelcome: (show: boolean) => void }) {
     const searchParams = useSearchParams()
-    const [posts, setPosts] = useState<Post[]>([])
-    const [loading, setLoading] = useState(true)
-    const [showPremiumWelcome, setShowPremiumWelcome] = useState(false)
 
     useEffect(() => {
         if (searchParams.get('premium') === 'success') {
@@ -42,7 +44,19 @@ export default function Home() {
             const timer = setTimeout(() => setShowPremiumWelcome(false), 8000)
             return () => clearTimeout(timer)
         }
-    }, [searchParams])
+    }, [searchParams, setShowPremiumWelcome])
+
+    return null
+}
+
+export default function Home() {
+    const { user } = useAuth()
+    // searchParams removed from here
+    const [posts, setPosts] = useState<Post[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showPremiumWelcome, setShowPremiumWelcome] = useState(false)
+
+    // Effect removed
 
     const handleLike = async (postId: string, currentLikes: string[]) => {
         if (!user) return;
@@ -282,6 +296,9 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-[#0C0C0C] pb-20 pt-8 relative">
+            <Suspense fallback={null}>
+                <PremiumWelcomeHandler setShowPremiumWelcome={setShowPremiumWelcome} />
+            </Suspense>
             <AnimatePresence>
                 {showPremiumWelcome && (
                     <motion.div
