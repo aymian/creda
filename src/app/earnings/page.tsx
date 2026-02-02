@@ -18,8 +18,18 @@ import { db } from "@/lib/firebase"
 import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore"
 import Link from "next/link"
 
+interface Earning {
+    id: string
+    amount: number
+    type: string
+    userId?: string
+    senderId?: string
+    matchId?: string
+    createdAt?: any
+}
+
 export default function EarningsDashboard() {
-    const [earnings, setEarnings] = useState<any[]>([])
+    const [earnings, setEarnings] = useState<Earning[]>([])
     const [stats, setStats] = useState({
         total: 0,
         withdrawFees: 0,
@@ -31,12 +41,12 @@ export default function EarningsDashboard() {
     useEffect(() => {
         const q = query(collection(db, "earnings"), orderBy("createdAt", "desc"), limit(100))
         const unsub = onSnapshot(q, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Earning[]
             setEarnings(list)
 
             const newStats = list.reduce((acc, curr) => {
-                const amt = typeof curr?.amount === 'number' ? curr.amount : Number(curr?.amount) || 0
-                const type = curr?.type || ""
+                const amt = typeof curr.amount === 'number' ? curr.amount : Number(curr.amount || 0)
+                const type = curr.type || ""
 
                 acc.total += amt
                 if (type === "withdrawal_fee") acc.withdrawFees += amt
