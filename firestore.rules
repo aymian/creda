@@ -113,5 +113,19 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOwner(resource.data.userId);
       allow delete: if isSignedIn() && isOwner(resource.data.userId);
     }
+
+    // Arcade Matches collection
+    match /matches/{matchId} {
+      // Allows users to read any match for joining/syncing
+      allow read: if isSignedIn();
+      // Allows users to create a new match lobby
+      allow create: if isSignedIn();
+      // Allows the sender or receiver of the match to update the document (scores, status, etc)
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.senderId || 
+        request.auth.uid == request.resource.data.receiverId ||
+        request.auth.uid == resource.data.receiverId
+      );
+    }
   }
 }
