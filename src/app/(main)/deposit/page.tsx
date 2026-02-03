@@ -94,8 +94,8 @@ export default function DepositPage() {
 
                         <div className="p-8 bg-black/40 border-2 border-dashed border-white/10 rounded-3xl space-y-4 text-center">
                             <div>
-                                <p className="text-[10px] font-black uppercase text-white/20 mb-1">MOMO Number</p>
-                                <p className="text-2xl font-black tracking-widest text-white">078 000 0000</p>
+                                <p className="text-[10px] font-black uppercase text-white/20 mb-1">MOMO Number  and names on it it is  ISHIMWE YVES OR YVES ISHIMWE</p>
+                                <p className="text-2xl font-black tracking-widest text-white">Mtn dial*182*1*1*0792898287# OR AIRTEL  dial *182*1*1*0732539470#</p>
                             </div>
                             <div>
                                 <p className="text-[10px] font-black uppercase text-white/20 mb-1">Receiver Name</p>
