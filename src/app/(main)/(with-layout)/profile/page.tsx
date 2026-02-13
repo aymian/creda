@@ -35,8 +35,8 @@ export default function ProfileRedirectPage() {
     }, [user, loading, router])
 
     return (
-        <div className="min-h-screen bg-[#0C0C0C] flex flex-col items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyber-pink mb-4" />
+        <div className="min-h-screen bg-[#0F0F0F] flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#FF2D6C] mb-6" />
             <p className="text-white/40 font-bold uppercase tracking-widest text-[10px]">Syncing Identity...</p>
         </div>
     )

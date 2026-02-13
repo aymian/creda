@@ -18,13 +18,14 @@ export default function ManagePage() {
     const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
     const [error, setError] = useState("")
-    const [activeTab, setActiveTab] = useState<"users" | "matches" | "deposits" | "withdrawals" | "earnings" | "system">("users")
+    const [activeTab, setActiveTab] = useState<"users" | "matches" | "deposits" | "withdrawals" | "earnings" | "system" | "posts">("users")
 
     const [users, setUsers] = useState<any[]>([])
     const [matches, setMatches] = useState<any[]>([])
     const [deposits, setDeposits] = useState<any[]>([])
     const [withdrawals, setWithdrawals] = useState<any[]>([])
     const [earnings, setEarnings] = useState<any[]>([])
+    const [posts, setPosts] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
 
@@ -61,8 +62,9 @@ export default function ManagePage() {
         const unsubDeps = onSnapshot(query(collection(db, "deposits"), orderBy("createdAt", "desc")), (snap) => setDeposits(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
         const unsubWiths = onSnapshot(query(collection(db, "withdrawals"), orderBy("createdAt", "desc")), (snap) => setWithdrawals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
         const unsubEarn = onSnapshot(query(collection(db, "earnings"), orderBy("createdAt", "desc")), (snap) => setEarnings(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+        const unsubPosts = onSnapshot(query(collection(db, "posts"), orderBy("createdAt", "desc")), (snap) => setPosts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
 
-        return () => { unsubUsers(); unsubMatches(); unsubDeps(); unsubWiths(); unsubEarn(); }
+        return () => { unsubUsers(); unsubMatches(); unsubDeps(); unsubWiths(); unsubEarn(); unsubPosts(); }
     }, [isAuthenticated])
 
     // Approval Handlers
@@ -81,7 +83,7 @@ export default function ManagePage() {
         try {
             const userRef = doc(db, "users", withd.userId)
             const userSnap = await getDoc(userRef)
-            
+
             if (!userSnap.exists()) {
                 alert("USER ACCOUNT NOT FOUND")
                 return
@@ -98,7 +100,7 @@ export default function ManagePage() {
             const batch = writeBatch(db)
             batch.update(userRef, { balance: increment(-requiredAmount) })
             batch.update(doc(db, "withdrawals", withd.id), { status: "approved", approvedAt: serverTimestamp() })
-            
+
             const feeDoc = doc(collection(db, "earnings"))
             batch.set(feeDoc, {
                 type: "withdrawal_fee",
@@ -112,6 +114,28 @@ export default function ManagePage() {
         } catch (err) {
             console.error("Approval error:", err)
             alert("PROTOCOL ERROR DURING APPROVAL")
+        }
+    }
+
+    const approvePost = async (post: any) => {
+        if (!post?.id) return
+        try {
+            await updateDoc(doc(db, "posts", post.id), { status: "approved", approvedAt: serverTimestamp() })
+            alert("POST APPROVED BY BEAUTY PROTOCOL")
+        } catch (err) {
+            console.error(err)
+            alert("FAILED TO APPROVE POST")
+        }
+    }
+
+    const rejectPost = async (post: any) => {
+        if (!post?.id) return
+        try {
+            await updateDoc(doc(db, "posts", post.id), { status: "rejected" })
+            alert("POST REJECTED - BEAUTY STANDARDS NOT MET")
+        } catch (err) {
+            console.error(err)
+            alert("FAILED TO REJECT POST")
         }
     }
 
@@ -162,7 +186,7 @@ export default function ManagePage() {
                     <h2 className="text-lg font-black tracking-tighter italic uppercase">Central Admin</h2>
                 </div>
                 <div className="flex gap-1 bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto max-w-[50%]">
-                    {["users", "matches", "deposits", "withdrawals", "earnings", "system"].map((tab) => (
+                    {["users", "matches", "deposits", "withdrawals", "earnings", "posts", "system"].map((tab) => (
                         <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white text-black shadow-lg' : 'text-white/20 hover:text-white'}`}>{tab}</button>
                     ))}
                 </div>
@@ -279,6 +303,85 @@ export default function ManagePage() {
                                 <div><p className="text-[10px] uppercase font-black text-white/40 tracking-widest">{stat.label}</p><p className="text-2xl font-black italic">{stat.value}</p></div>
                             </div>
                         ))}
+                    </motion.div>
+                )}
+
+                {activeTab === "posts" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-4xl font-black tracking-tighter uppercase italic">Beauty Submissions</h3>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-cyber-pink bg-cyber-pink/10 px-4 py-2 rounded-full border border-cyber-pink/20">
+                                {posts.filter(p => p.status === 'pending').length} Pending Review
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {posts.map((post) => (
+                                <div key={post.id} className="group bg-[#0C0C0C] border border-white/5 rounded-[40px] overflow-hidden flex flex-col relative">
+                                    {/* Status Badge */}
+                                    <div className="absolute top-6 left-6 z-10">
+                                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md border ${post.status === 'approved' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                                post.status === 'rejected' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                                    'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse'
+                                            }`}>
+                                            {post.status || 'Pending'}
+                                        </span>
+                                    </div>
+
+                                    {/* Media Section */}
+                                    <div className="aspect-square relative overflow-hidden bg-white/5">
+                                        {post.mediaUrl ? (
+                                            <img src={post.mediaUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Post" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-white/10 italic">No Media</div>
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60" />
+
+                                        <div className="absolute bottom-6 left-6 right-6 flex items-center gap-3">
+                                            <img src={post.authorPhoto} className="w-10 h-10 rounded-full border-2 border-white/10" alt="Avatar" />
+                                            <div>
+                                                <div className="text-sm font-black italic uppercase">@{post.authorUsername}</div>
+                                                <div className="text-[8px] text-white/40 font-black uppercase tracking-widest">{post.authorName}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Content Section */}
+                                    <div className="p-8 space-y-6 flex-1 flex flex-col justify-between">
+                                        <div>
+                                            <p className="text-white/60 text-sm italic font-medium leading-relaxed">"{post.content}"</p>
+                                        </div>
+
+                                        <div className="flex gap-2 pt-4">
+                                            {post.status === 'pending' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => rejectPost(post)}
+                                                        className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl text-[9px] font-black uppercase text-white/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                    <button
+                                                        onClick={() => approvePost(post)}
+                                                        className="flex-2 py-4 bg-cyber-pink text-white rounded-2xl text-[9px] font-black uppercase shadow-lg shadow-cyber-pink/20 hover:scale-105 active:scale-95 transition-all"
+                                                    >
+                                                        Approve Beauty
+                                                    </button>
+                                                </>
+                                            )}
+                                            {(post.status === 'approved' || post.status === 'rejected') && (
+                                                <button
+                                                    onClick={() => updateDoc(doc(db, "posts", post.id), { status: 'pending' })}
+                                                    className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[9px] font-black uppercase text-white/20 hover:text-white transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <RefreshCw className="w-3 h-3" /> Re-Evaluate
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </motion.div>
                 )}
 

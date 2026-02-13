@@ -32,10 +32,12 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 
 export function UserDropdown() {
-    const { user } = useAuth()
+    const { user, userData } = useAuth()
     const [isOpen, setIsOpen] = useState(false)
     const [isDarkMode, setIsDarkMode] = useState(true)
     const dropdownRef = useRef<HTMLDivElement>(null)
+
+    const profileHref = userData?.username ? `/${userData.username}` : "/profile"
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -129,7 +131,7 @@ export function UserDropdown() {
                     >
                         <div className="max-h-[85vh] overflow-y-auto custom-scrollbar">
                             {/* Header Section */}
-                            <Link href="/profile" onClick={() => setIsOpen(false)}>
+                            <Link href={profileHref} onClick={() => setIsOpen(false)}>
                                 <div className="flex items-center gap-4 px-5 py-5 hover:bg-white/5 cursor-pointer group/header border-b border-white/5 transition-all">
                                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-cyber-pink/20 to-purple-500/20 border-2 border-white/10 group-hover/header:border-cyber-pink/50 transition-all flex items-center justify-center">
                                         {user.photoURL ? (

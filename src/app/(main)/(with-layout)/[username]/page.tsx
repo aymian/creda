@@ -16,7 +16,19 @@ import {
     Check,
     Briefcase,
     Loader2,
-    Lock
+    Lock,
+    Gem,
+    Plus,
+    Video,
+    LayoutGrid,
+    Star,
+    Film,
+    CreditCard,
+    Gift,
+    Camera,
+    Pencil,
+    ChevronRight,
+    Image as ImageIcon
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { UserListModal } from "@/components/UserListModal"
@@ -46,7 +58,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const { user: currentUser } = useAuth()
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("posts")
+    const [activeTab, setActiveTab] = useState("all")
     const [listModal, setListModal] = useState<{ isOpen: boolean, type: "followers" | "following" }>({
         isOpen: false,
         type: "followers"
@@ -207,15 +219,15 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#0C0C0C]">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyber-pink"></div>
+            <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FF2D6C]"></div>
             </div>
         )
     }
 
     if (!profile) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-[#0C0C0C] text-white space-y-4">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#0F0F0F] text-white space-y-4">
                 <h1 className="text-4xl font-black text-white/20">404</h1>
                 <p className="text-xl font-bold">User @{username} not found</p>
                 <button
@@ -232,158 +244,146 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const displayedFollowing = profile.followingCount ?? (Array.isArray(profile.following) ? profile.following.length : (profile.following || 0))
 
     return (
-        <div className="min-h-screen bg-[#0C0C0C] pb-20">
-            {/* Hero / Cover */}
-            <div className="relative h-[250px] md:h-[350px] w-full bg-gradient-to-r from-purple-900 to-cyber-pink/20 overflow-hidden">
-                {profile.coverURL ? (
-                    <img src={profile.coverURL} alt="Cover" className="w-full h-full object-cover" />
-                ) : (
-                    <div className="w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-                )}
-                <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0C0C0C] to-transparent" />
-            </div>
-
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="min-h-screen bg-[#0F0F0F]">
+            <div className="max-w-5xl mx-auto px-6 pt-16 pb-20">
                 {/* Profile Header */}
-                <div className="flex flex-col md:flex-row items-start gap-6 -mt-16 md:-mt-24 mb-8">
+                <div className="flex flex-col md:flex-row items-start gap-8 mb-16">
                     {/* Avatar */}
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="relative"
-                    >
-                        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full p-1 bg-[#0C0C0C] ring-4 ring-white/10">
-                            <div className="w-full h-full rounded-full overflow-hidden bg-white/10">
-                                {profile.photoURL ? (
-                                    <img src={profile.photoURL} alt={profile.displayName} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyber-pink to-purple-600 text-4xl font-black text-white">
-                                        {profile.displayName?.[0] || profile.username?.[0] || 'U'}
-                                    </div>
-                                )}
-                            </div>
+                    <div className="relative">
+                        <div className="w-36 h-36 rounded-full overflow-hidden bg-[#1A1A1A] relative">
+                            {profile.photoURL ? (
+                                <img src={profile.photoURL} alt={profile.displayName} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-white/10 text-4xl font-bold text-white">
+                                    {profile.displayName?.[0] || profile.username?.[0] || 'U'}
+                                </div>
+                            )}
+                            {currentUser?.uid === profile.uid && (
+                                <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
+                                    <Camera className="w-6 h-6 text-white" />
+                                </div>
+                            )}
                         </div>
-                    </motion.div>
+                        {currentUser?.uid === profile.uid && (
+                            <div className="absolute bottom-1 right-1 w-9 h-9 bg-[#1A1A1A] rounded-full flex items-center justify-center border border-black shadow-lg cursor-pointer hover:bg-[#252525] transition-colors">
+                                <Camera className="w-4 h-4 text-white" />
+                            </div>
+                        )}
+                    </div>
 
                     {/* Info & Actions */}
-                    <div className="flex-1 w-full pt-16 md:pt-24 space-y-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h1 className="text-3xl font-black text-white flex items-center gap-2">
-                                    {profile.displayName}
-                                    <Check className="w-5 h-5 text-cyber-cyan bg-cyber-cyan/10 rounded-full p-0.5" strokeWidth={4} />
-                                    {profile.isPrivate && <Lock className="w-4 h-4 text-white/20" />}
+                    <div className="flex-1 space-y-4 pt-2">
+                        <div className="flex items-start justify-between">
+                            <div className="space-y-2">
+                                <h1 className="text-2xl font-bold text-white tracking-tight">
+                                    {profile.displayName || profile.username}
                                 </h1>
-                                <p className="text-white/40 font-bold">@{profile.username}</p>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[14px] text-white/90 flex items-center gap-1.5">
+                                        <span role="img" aria-label="bio">💟</span>
+                                        Me on Telegram: <span className="text-white font-medium">@exclusvvbot</span>
+                                    </span>
+                                </div>
                             </div>
-
-                            <div className="flex items-center gap-3">
-                                {currentUser?.uid === profile.uid ? (
-                                    <button className="px-6 py-2 bg-white/5 border border-white/10 rounded-full font-bold text-white hover:bg-white/10 transition-all">
-                                        Edit Profile
-                                    </button>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={handleFollow}
-                                            disabled={isFollowLoading}
-                                            className={cn(
-                                                "px-8 py-2 rounded-full font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(255,45,108,0.3)] flex items-center gap-2",
-                                                isFollowing
-                                                    ? "bg-white/5 border border-white/10 text-white hover:bg-white/10"
-                                                    : "bg-cyber-pink text-white hover:scale-105"
-                                            )}
-                                        >
-                                            {isFollowLoading ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : isFollowing ? (
-                                                "Unfollow"
-                                            ) : hasPendingRequest ? (
-                                                "Requested"
-                                            ) : (
-                                                "Follow"
-                                            )}
-                                        </button>
-                                        {(isFollowing || !profile.isPrivate) && (
-                                            <button
-                                                onClick={handleMessage}
-                                                className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all"
-                                            >
-                                                <MessageCircle className="w-5 h-5" />
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-                                <button className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all">
-                                    <Share2 className="w-5 h-5" />
+                            <div className="flex items-center gap-4">
+                                <button className="p-1 text-white/40 hover:text-white transition-colors">
+                                    <Share2 className="w-5 h-5 stroke-[1.5]" />
                                 </button>
-                                <button className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white hover:bg-white/10 transition-all">
-                                    <MoreHorizontal className="w-5 h-5" />
+                                <button className="p-1 text-white/40 hover:text-white transition-colors">
+                                    <MoreHorizontal className="w-5 h-5 stroke-[1.5]" />
                                 </button>
                             </div>
                         </div>
 
-                        {profile.bio && (
-                            <p className="text-white/80 max-w-2xl leading-relaxed">
-                                {profile.bio}
-                            </p>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-6 text-sm text-white/40 font-medium">
-                            {profile.location && (
-                                <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-4 h-4" />
-                                    {profile.location}
+                        {/* Stats */}
+                        <div className="flex items-center gap-10">
+                            <div className="space-y-0.5">
+                                <div className="text-xl font-bold text-white leading-none">0</div>
+                                <div className="flex items-center gap-1 text-[13px] font-medium text-white/40">
+                                    <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-white/40 mt-0.5" />
+                                    Earned
                                 </div>
-                            )}
-                            {profile.website && (
-                                <div className="flex items-center gap-1.5">
-                                    <LinkIcon className="w-4 h-4" />
-                                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-cyber-cyan hover:underline">
-                                        {profile.website.replace(/^https?:\/\//, '')}
-                                    </a>
-                                </div>
-                            )}
-                            <div className="flex items-center gap-1.5">
-                                <Calendar className="w-4 h-4" />
-                                Joined {new Date().getFullYear()} {/* TODO: Use actual createdAt */}
                             </div>
-                        </div>
-
-                        <div className="flex items-center gap-6 pt-2">
                             <div
-                                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                className="space-y-0.5 cursor-pointer group"
                                 onClick={() => setListModal({ isOpen: true, type: "followers" })}
                             >
-                                <span className="text-white font-black text-lg">{displayedFollowers.toLocaleString()}</span>
-                                <span className="text-white/40 text-sm font-bold uppercase tracking-wide">Followers</span>
+                                <div className="text-xl font-bold text-white leading-none group-hover:text-white transition-colors">{displayedFollowers}</div>
+                                <div className="text-[13px] font-medium text-white/40">Followers</div>
                             </div>
-                            <div
-                                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => setListModal({ isOpen: true, type: "following" })}
-                            >
-                                <span className="text-white font-black text-lg">{displayedFollowing.toLocaleString()}</span>
-                                <span className="text-white/40 text-sm font-bold uppercase tracking-wide">Following</span>
-                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2.5 pt-2">
+                            {currentUser?.uid === profile.uid ? (
+                                <>
+                                    <button className="h-11 px-6 bg-gradient-to-r from-[#FF2D6C] to-[#FF2D9E] rounded-full flex items-center gap-2 text-white font-bold text-sm hover:opacity-90 transition-all">
+                                        <div className="w-5 h-5 rounded-full border border-white flex items-center justify-center">
+                                            <Plus className="w-3.5 h-3.5" />
+                                        </div>
+                                        Create Post
+                                    </button>
+                                    <button className="h-11 px-6 bg-transparent border border-white/20 rounded-full flex items-center gap-2 text-white font-bold text-sm hover:bg-white/5 transition-all">
+                                        <Video className="w-4 h-4" />
+                                        Start stream
+                                    </button>
+                                    <div className="w-10 h-10 rounded-full bg-[#1A1A1A] border border-white/5 flex items-center justify-center relative cursor-pointer hover:bg-[#252525] transition-colors">
+                                        <Gem className="w-4 h-4 text-white/80" />
+                                        <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#FF2D6C] rounded-full border-2 border-[#0F0F0F]" />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleMessage}
+                                        className="h-10 px-8 bg-white/5 border border-white/5 rounded-full flex items-center gap-2.5 text-white font-bold text-[13px] hover:bg-white/10 transition-all"
+                                    >
+                                        <MessageCircle className="w-5 h-5 stroke-[1.5]" />
+                                        Message
+                                    </button>
+                                    <button
+                                        onClick={handleFollow}
+                                        className="h-10 px-8 bg-white/5 border border-white/5 rounded-full flex items-center gap-2.5 text-white font-bold text-[13px] hover:bg-white/10 transition-all"
+                                    >
+                                        <Star className="w-5 h-5 stroke-[1.5]" />
+                                        Become a Fan
+                                    </button>
+                                    <button
+                                        className="h-10 px-8 bg-white/5 border border-white/5 rounded-full flex items-center gap-2.5 text-white font-bold text-[13px] hover:bg-white/10 transition-all"
+                                    >
+                                        <Gift className="w-5 h-5 stroke-[1.5]" />
+                                        Send gift
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="border-b border-white/10 mb-8">
-                    <div className="flex gap-8">
-                        {['posts', 'media', 'about'].map(tab => (
+                <div className="border-b border-white/10 mb-10 overflow-x-auto no-scrollbar">
+                    <div className="flex gap-16 min-w-max">
+                        {[
+                            { id: 'all', label: 'All', icon: LayoutGrid },
+                            { id: 'fans', label: 'For Fans', icon: Star },
+                            { id: 'moments', label: 'Moments', icon: Film },
+                            { id: 'tango', label: 'Tango Cards', icon: CreditCard },
+                            { id: 'collections', label: 'Collections', icon: Gift }
+                        ].map(tab => (
                             <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`pb-4 text-sm font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === tab ? 'text-white' : 'text-white/20 hover:text-white/60'
-                                    }`}
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={cn(
+                                    "pb-4 flex flex-col items-center gap-2.5 text-[13px] font-medium transition-all relative min-w-[60px]",
+                                    activeTab === tab.id ? "text-white" : "text-white/40 hover:text-white/70"
+                                )}
                             >
-                                {tab}
-                                {activeTab === tab && (
+                                <tab.icon className={cn("w-5 h-5 stroke-[1.5]", activeTab === tab.id ? "text-white" : "text-white/40")} />
+                                {tab.label}
+                                {activeTab === tab.id && (
                                     <motion.div
-                                        layoutId="activeTab"
-                                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyber-pink"
+                                        layoutId="activeTabProfile"
+                                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-white"
                                     />
                                 )}
                             </button>
@@ -392,37 +392,28 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </div>
 
                 {/* Content Area */}
-                <div className="min-h-[300px]">
+                <div className="min-h-[400px]">
                     {profile.isPrivate && !isFollowing && currentUser?.uid !== profile.uid ? (
                         <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-                            <div className="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center border border-white/10 mb-6 group hover:border-cyber-pink/50 transition-colors">
-                                <Lock className="w-10 h-10 text-white/20 group-hover:text-cyber-pink transition-colors" />
+                            <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 mb-6">
+                                <Lock className="w-8 h-8 text-white/20" />
                             </div>
-                            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">This account is private</h3>
-                            <p className="text-white/40 max-w-sm font-medium">Follow this user to see their posts and visual identity moments.</p>
+                            <h3 className="text-xl font-bold text-white mb-2">Private Profile</h3>
+                            <p className="text-white/40 max-w-sm text-sm">Follow this user to see their posts and moments.</p>
                         </div>
                     ) : (
-                        <>
-                            {activeTab === 'posts' && (
-                                <div className="text-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
-                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-white/20">
-                                        <Briefcase className="w-8 h-8" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white mb-2">No posts yet</h3>
-                                    <p className="text-white/40 max-w-sm mx-auto">
-                                        This user hasn't published any content to their feed yet.
-                                    </p>
-                                </div>
-                            )}
-                            {activeTab === 'media' && (
-                                <div className="grid grid-cols-3 gap-1 md:gap-4">
-                                    {/* Placeholder for media grid */}
-                                    {[1, 2, 3, 4, 5, 6].map(i => (
-                                        <div key={i} className="aspect-square bg-white/5 rounded-xl animate-pulse" />
-                                    ))}
-                                </div>
-                            )}
-                        </>
+                        <div className="flex flex-col items-center justify-center py-24 text-center">
+                            <div className="w-24 h-24 relative mb-6">
+                                <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white/10">
+                                    <rect x="24" y="24" width="48" height="48" rx="12" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4"/>
+                                    <circle cx="48" cy="44" r="8" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4"/>
+                                    <path d="M36 60C36 55.5817 39.5817 52 44 52H52C56.4183 52 60 55.5817 60 60" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4"/>
+                                    <path d="M70 30L74 26M74 30L70 26" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                    <circle cx="22" cy="74" r="2" fill="currentColor"/>
+                                </svg>
+                            </div>
+                            <p className="text-white/20 font-bold text-sm">No Posts</p>
+                        </div>
                     )}
                 </div>
             </div>

@@ -1,28 +1,18 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     X,
-    ArrowLeft,
     Image as ImageIcon,
     Smile,
     MapPin,
-    Hash,
     AlignLeft,
-    Video,
-    Film,
-    Radio,
-    Sparkles,
-    Send,
-    Plus,
-    Camera,
-    Mic,
+    ChevronRight,
     MoreHorizontal
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { Header } from "@/components/header"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { uploadToCloudinary } from "@/lib/cloudinary"
@@ -43,19 +33,11 @@ export default function CreatePage() {
 
 function CreateContent() {
     const router = useRouter()
-    const searchParams = useSearchParams()
     const { user } = useAuth()
-
-    // Default to 'post' if type param is missing or invalid
-    const typeParam = searchParams.get('type')
-    const [activeType, setActiveType] = useState<CreateType>(
-        (typeParam as CreateType) || 'post'
-    )
-
     const [content, setContent] = useState("")
+    const [isPosting, setIsPosting] = useState(false)
     const [media, setMedia] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    const [isPosting, setIsPosting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,306 +55,192 @@ function CreateContent() {
         if (fileInputRef.current) fileInputRef.current.value = ""
     }
 
-    // Sync URL with state
-    const handleTypeChange = (newType: CreateType) => {
-        setActiveType(newType)
-        router.push(`/create?type=${newType}`)
-    }
-
-    const handleShare = async () => {
-        if ((!content && !media) || isPosting || !user) return
-
+    const handlePost = async () => {
+        if (!content && !media) return
         setIsPosting(true)
         try {
             let mediaUrl = null
             let mediaType = null
 
-            // Upload media
             if (media) {
                 const uploadResult = await uploadToCloudinary(media, "posts")
-
-                if (!uploadResult.success) {
-                    throw new Error(uploadResult.error || "Upload failed")
+                if (uploadResult.success) {
+                    mediaUrl = uploadResult.url
+                    mediaType = uploadResult.resourceType === "video" ? "video" : "image"
                 }
-
-                mediaUrl = uploadResult.url
-                mediaType = uploadResult.resourceType === "video" ? "video" : "image"
             }
 
-            // Save to Firestore
             await addDoc(collection(db, "posts"), {
                 content,
                 mediaUrl,
                 mediaType,
-                authorId: user.uid,
-                authorName: user.displayName || user.email?.split('@')[0] || "User",
-                authorPhoto: user.photoURL,
-                authorUsername: user.email?.split('@')[0] || "user", // minimal fallback
+                authorId: user?.uid,
+                authorName: user?.displayName || user?.email?.split('@')[0] || "User",
+                authorPhoto: user?.photoURL,
+                authorUsername: user?.email?.split('@')[0] || "user",
                 likes: [],
                 comments: 0,
                 createdAt: serverTimestamp(),
-                type: activeType
+                type: 'thread',
+                status: 'pending'
             })
 
             router.push("/")
-
-        } catch (error: any) {
+        } catch (error) {
             console.error("Error creating post:", error)
-            // Show more detailed error if available
-            alert(`Failed to post: ${error.message || "Unknown error"}`)
         } finally {
             setIsPosting(false)
         }
     }
 
-    const creationTypes = [
-        { id: 'story', label: 'Story', icon: Sparkles, color: 'text-yellow-400' },
-        { id: 'post', label: 'Post', icon: ImageIcon, color: 'text-cyber-cyan' },
-        { id: 'thread', label: 'Thread', icon: AlignLeft, color: 'text-white' },
-        { id: 'live', label: 'Live', icon: Radio, color: 'text-red-500' },
-        { id: 'lice', label: 'Lice', icon: Film, color: 'text-purple-500' } // Keeping 'Lice' as requested, likely means 'Slice' or just Clips
-    ]
-
     return (
-        <div className="min-h-screen bg-[#0C0C0C] text-white flex flex-col items-center">
-            <Header />
-
-            {/* Creation Toolbar */}
-            <div className="w-full max-w-2xl flex items-center justify-between p-4 pt-20 border-b border-white/10 bg-[#0C0C0C] sticky top-0 z-40">
-                <button
-                    onClick={() => router.back()}
-                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                >
-                    <X className="w-6 h-6" />
-                </button>
-                <h1 className="text-lg font-black uppercase tracking-widest hidden sm:block">
-                    New {creationTypes.find(t => t.id === activeType)?.label}
-                </h1>
-                <button
-                    onClick={handleShare}
-                    disabled={(!content && !media && activeType !== 'live') || isPosting}
-                    className={`px-6 py-2 rounded-full font-black text-sm uppercase tracking-wider transition-all flex items-center gap-2
-                        ${(!content && !media && activeType !== 'live') || isPosting
-                            ? 'bg-white/5 text-white/20 cursor-not-allowed'
-                            : 'bg-cyber-pink text-white hover:scale-105 shadow-[0_0_20px_rgba(255,45,108,0.3)]'
-                        }
-                    `}
-                >
-                    {isPosting ? 'Posting...' : (activeType === 'live' ? 'Go Live' : 'Share')}
-                </button>
-            </div>
-
-            {/* Type Selector (Bottom on mobile, top on desktop usually, but let's stick to centralized or bottom for creation) */}
-            {/* Let's put it below header for easy access */}
-            <div className="w-full max-w-2xl overflow-x-auto no-scrollbar py-4 border-b border-white/5 bg-[#0C0C0C]">
-                <div className="flex items-center justify-start sm:justify-center gap-2 px-4 min-w-max">
-                    {creationTypes.map((type) => {
-                        const Icon = type.icon
-                        const isActive = activeType === type.id
-                        return (
-                            <button
-                                key={type.id}
-                                onClick={() => handleTypeChange(type.id as CreateType)}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-300 relative overflow-hidden group
-                                    ${isActive ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}
-                                `}
-                            >
-                                <Icon className={`w-5 h-5 ${isActive ? type.color : ''} transition-colors`} />
-                                <span className="font-bold text-sm tracking-wide">{type.label}</span>
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="activeTab"
-                                        className="absolute inset-0 border-2 border-white/10 rounded-full"
-                                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                                    />
-                                )}
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
-
-            {/* Main Editor Area */}
-            <div className="flex-1 w-full max-w-2xl p-4 overflow-y-auto custom-scrollbar">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeType}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.2 }}
-                        className="h-full flex flex-col"
+        <div className="min-h-screen bg-black sm:bg-[#0C0C0C] text-white flex flex-col items-center sm:pt-10">
+            {/* Modal Container */}
+            <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-[620px] bg-[#121212] sm:rounded-3xl border border-white/[0.05] flex flex-col min-h-screen sm:min-h-0 sm:max-h-[85vh] overflow-hidden"
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.03]">
+                    <button 
+                        onClick={() => router.back()}
+                        className="p-2 hover:bg-white/5 rounded-full transition-colors"
                     >
-                        {/* POST EDITOR */}
-                        {activeType === 'post' && (
-                            <div className="space-y-4">
-                                <div className="flex gap-4">
-                                    <div className="w-12 h-12 rounded-full overflow-hidden bg-white/10 flex-shrink-0">
-                                        {user?.photoURL ? (
-                                            <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyber-pink to-purple-600 text-white font-black">
-                                                {user?.displayName?.[0] || 'U'}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <textarea
-                                        value={content}
-                                        onChange={(e) => setContent(e.target.value)}
-                                        placeholder="What's happening in your universe?"
-                                        className="flex-1 bg-transparent text-xl text-white placeholder:text-white/20 outline-none resize-none min-h-[150px]"
-                                        autoFocus
-                                    />
-                                </div>
+                        <X className="w-6 h-6" />
+                    </button>
+                    <h2 className="text-[17px] font-bold tracking-tight">New thread</h2>
+                    <div className="flex items-center gap-1">
+                        <button className="p-2 hover:bg-white/5 rounded-full transition-colors opacity-80">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="5" />
+                                <path d="M8 3v18" />
+                            </svg>
+                        </button>
+                        <button className="p-2 hover:bg-white/5 rounded-full transition-colors opacity-80">
+                            <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
 
-                                {/* Media Preview */}
-                                <AnimatePresence>
-                                    {previewUrl && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40"
-                                        >
-                                            <button
-                                                onClick={removeMedia}
-                                                className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-colors z-10"
-                                            >
-                                                <X className="w-5 h-5" />
-                                            </button>
-                                            {media?.type.startsWith('video') ? (
-                                                <video src={previewUrl} controls className="w-full max-h-[500px] object-contain" />
-                                            ) : (
-                                                <img src={previewUrl} alt="Preview" className="w-full max-h-[500px] object-contain" />
-                                            )}
-                                        </motion.div>
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+                    <div className="flex gap-4">
+                        {/* Left column (Avatar + Thread line) */}
+                        <div className="flex flex-col items-center">
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden ring-1 ring-white/10">
+                                {user?.photoURL ? (
+                                    <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-white font-semibold text-sm">
+                                        {user?.displayName?.[0] || user?.email?.[0] || 'U'}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="w-[2px] flex-1 bg-white/[0.1] my-2 rounded-full" />
+                            <div className="relative w-10 flex justify-center">
+                                <div className="w-5 h-5 rounded-full bg-zinc-800 overflow-hidden opacity-30 blur-[0.3px]">
+                                    {user?.photoURL ? (
+                                        <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-zinc-700" />
                                     )}
-                                </AnimatePresence>
+                                </div>
+                            </div>
+                        </div>
 
-                                <div className="border-t border-white/10 pt-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            className="hidden"
-                                            accept="image/*,video/*"
-                                            onChange={handleFileSelect}
-                                        />
+                        {/* Right column (Input + Controls) */}
+                        <div className="flex-1 space-y-0.5">
+                            <div className="flex items-center gap-1 mb-1">
+                                <span className="font-bold text-[15px] cursor-pointer">
+                                    {user?.email?.split('@')[0] || "user"}
+                                </span>
+                                <ChevronRight className="w-3.5 h-3.5 text-white/30" />
+                                <button className="text-[14px] text-white/30 font-medium hover:text-white/40 transition-colors">Add a topic</button>
+                            </div>
+                            
+                            <textarea
+                                value={content}
+                                onChange={(e) => setContent(e.target.value)}
+                                placeholder="What's new?"
+                                className="w-full bg-transparent text-[15px] text-[#F3F5F7] placeholder:text-[#777777] outline-none resize-none min-h-[40px] font-normal leading-relaxed mb-2"
+                                autoFocus
+                            />
+
+                            {/* Image/Media Preview */}
+                            <AnimatePresence>
+                                {previewUrl && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className="relative mt-2 rounded-xl overflow-hidden border border-white/10 group"
+                                    >
                                         <button
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="p-3 bg-white/5 rounded-full text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors tooltip-trigger"
-                                            title="Add Photo/Video"
+                                            onClick={removeMedia}
+                                            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all z-10"
                                         >
-                                            <ImageIcon className="w-5 h-5" />
+                                            <X className="w-4 h-4" />
                                         </button>
-                                        <button className="p-3 bg-white/5 rounded-full text-yellow-400 hover:bg-yellow-400/10 transition-colors">
-                                            <Smile className="w-5 h-5" />
-                                        </button>
-                                        <button className="p-3 bg-white/5 rounded-full text-green-400 hover:bg-green-400/10 transition-colors">
-                                            <MapPin className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                    <span className="text-white/20 text-xs font-bold uppercase">{content.length}/500</span>
-                                </div>
-                            </div>
-                        )}
+                                        <img src={previewUrl} alt="Preview" className="w-full max-h-[400px] object-cover" />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
-                        {/* STORY EDITOR */}
-                        {activeType === 'story' && (
-                            <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl bg-white/[0.02] p-8 text-center cursor-pointer hover:border-cyber-pink/50 hover:bg-cyber-pink/[0.02] transition-all group">
-                                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform mb-6">
-                                    <Camera className="w-10 h-10 text-white/40 group-hover:text-cyber-pink transition-colors" />
-                                </div>
-                                <h3 className="text-2xl font-black text-white mb-2">Create a Story</h3>
-                                <p className="text-white/40 max-w-xs mx-auto mb-8">
-                                    Share a moment that disappears after 24 hours. Photos or videos up to 60s.
-                                </p>
-                                <button className="px-8 py-3 bg-white/10 rounded-full font-bold text-white hover:bg-white/20 transition-all">
-                                    Select Media
+                            {/* Toolbar Buttons */}
+                            <div className="flex items-center gap-0.5 py-1 -ml-2">
+                                <button onClick={() => fileInputRef.current?.click()} className="p-2 text-white/40 hover:text-white transition-colors" title="Media"><ImageIcon className="w-5 h-5" /></button>
+                                <button className="p-2 text-white/40 hover:text-white transition-colors" title="GIF">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h10"/></svg>
+                                </button>
+                                <button className="p-2 text-white/40 hover:text-white transition-colors" title="Emoji"><Smile className="w-5 h-5" /></button>
+                                <button className="p-2 text-white/40 hover:text-white transition-colors" title="Alignment"><AlignLeft className="w-5 h-5" /></button>
+                                <button className="p-2 text-white/40 hover:text-white transition-colors" title="Poll">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                                </button>
+                                <button className="p-2 text-white/40 hover:text-white transition-colors" title="Location"><MapPin className="w-5 h-5" /></button>
+                            </div>
+
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleFileSelect}
+                            />
+
+                            <div className="pt-1">
+                                <button className="text-[14px] text-white/30 font-medium hover:text-white/40 transition-colors">
+                                    Add to thread
                                 </button>
                             </div>
-                        )}
+                        </div>
+                    </div>
+                </div>
 
-                        {/* THREAD EDITOR */}
-                        {activeType === 'thread' && (
-                            <div className="space-y-6">
-                                <div className="relative pl-8 border-l-2 border-white/10 ml-4 space-y-8">
-                                    {/* Thread Item 1 */}
-                                    <div className="relative">
-                                        <div className="absolute -left-[41px] top-0 w-10 h-10 rounded-full bg-white/10 overflow-hidden ring-4 ring-[#0C0C0C]">
-                                            {user?.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover" /> : null}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <h4 className="text-sm font-bold text-white mb-1">Start thread...</h4>
-                                            <textarea
-                                                placeholder="Thread 1..."
-                                                className="w-full bg-white/5 rounded-xl p-4 text-white placeholder:text-white/20 outline-none resize-none min-h-[100px]"
-                                            />
-                                        </div>
-                                    </div>
+                {/* Footer */}
+                <div className="p-4 sm:px-6 flex items-center justify-between bg-black sm:bg-transparent">
+                    <button className="flex items-center gap-2 text-white/40 hover:text-white/60 transition-colors group">
+                        <div className="p-1.5 border border-white/10 rounded-lg group-hover:border-white/20">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <span className="text-[14px] font-medium">Reply options</span>
+                    </button>
+                    <button
+                        onClick={handlePost}
+                        disabled={(!content && !media) || isPosting}
+                        className={`px-6 py-2 rounded-full font-bold text-[15px] transition-all
+                            ${(!content && !media) || isPosting
+                                ? 'bg-[#121212] text-white/20 cursor-not-allowed border border-white/5'
+                                : 'bg-white text-black hover:bg-zinc-200'
+                            }
+                        `}
+                    >
+                        {isPosting ? 'Posting...' : 'Post'}
+                    </button>
+                </div>
 
-                                    {/* Add Thread Button */}
-                                    <div className="relative">
-                                        <div className="absolute -left-[37px] top-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center ring-4 ring-[#0C0C0C]">
-                                            <Plus className="w-4 h-4 text-white/40" />
-                                        </div>
-                                        <button className="text-cyber-pink font-bold text-sm hover:underline ml-2">
-                                            Add to thread
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* LIVE EDITOR */}
-                        {activeType === 'live' && (
-                            <div className="flex-1 bg-black rounded-3xl overflow-hidden relative flex flex-col items-center justify-center">
-                                {/* Mock Camera View */}
-                                <div className="absolute inset-0 bg-white/5 flex items-center justify-center">
-                                    <p className="text-white/20 font-black text-xl uppercase tracking-widest">Camera Preview</p>
-                                </div>
-
-                                <div className="relative z-10 w-full p-8 flex flex-col justify-end h-full bg-gradient-to-t from-black/80 to-transparent">
-                                    <input
-                                        type="text"
-                                        placeholder="Add a title to your live..."
-                                        className="w-full bg-transparent text-center text-2xl font-black text-white placeholder:text-white/40 outline-none mb-8"
-                                    />
-
-                                    <div className="flex items-center justify-center gap-6 mb-8">
-                                        <button className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all backdrop-blur-md">
-                                            <Video className="w-6 h-6 text-white" />
-                                        </button>
-                                        <button className="w-20 h-20 bg-red-500 rounded-full shadow-[0_0_40px_rgba(239,68,68,0.5)] border-4 border-white/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
-                                            <div className="w-8 h-8 rounded-sm bg-white" />
-                                        </button>
-                                        <button className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all backdrop-blur-md">
-                                            <Mic className="w-6 h-6 text-white" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* LICE (Mapped to Clips/Shorts) EDITOR */}
-                        {activeType === 'lice' && (
-                            <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl bg-white/[0.02] p-8 text-center cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/[0.02] transition-all group">
-                                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform mb-6">
-                                    <Film className="w-10 h-10 text-white/40 group-hover:text-purple-500 transition-colors" />
-                                </div>
-                                <h3 className="text-2xl font-black text-white mb-2">Create a Lice</h3>
-                                <p className="text-white/40 max-w-xs mx-auto mb-8">
-                                    Upload short, looping videos. Add music, effects, and more.
-                                </p>
-                                <button className="px-8 py-3 bg-white/10 rounded-full font-bold text-white hover:bg-white/20 transition-all">
-                                    Select Video
-                                </button>
-                            </div>
-                        )}
-
-                    </motion.div>
-                </AnimatePresence>
-            </div>
+            </motion.div>
         </div>
     )
 }
